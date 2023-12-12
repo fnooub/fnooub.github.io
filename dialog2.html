@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dialog Example</title>
+  <style>
+    #dialog {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px;
+      background-color: #fff;
+      border: 1px solid #ccc;
+      z-index: 1000;
+    }
+
+    .clicked {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+
+<div id="content">
+  <i h="kiên trì" t="坚持" v="kiên trì/giữ vững/khăng khăng giữ" p="v" id="ran0">Kiên trì</i>
+  <i h="nguyên sang" t="原创" v="bản gốc/nguyên sang/nguyên sang " p="n" id="ran1">bản gốc</i>
+  <i h="đỗ tuyệt" t="杜绝" v="ngăn chặn/tiêu diệt/diệt sạch/ngăn chặn tận gốc/khế ước đoạn mại/hợp đồng mua đứt bán đoạn/đỗ tuyệt/ngăn chặn đoạn tuyệt" p="nr" id="ran2">ngăn chặn</i>
+  <i h="vi quy" t="违规" v="làm trái quy tắc/vi quy/không tuân theo quy định/phạm quy/vi phạm quy lệ" p="v" id="ran3">làm trái quy tắc</i>
+  <i h="thừa nặc" t="承诺" v="hứa hẹn/đồng ý làm/nhận lời làm/chấp thuận/cho phép/cam kết" p="v" id="ran4">hứa hẹn</i>
+  <i h="thư" t="书" v="sách/thư/viết/Sách" p="n" id="ran5">sách</i>
+</div>
+
+<div id="dialog">
+  <div id="dialogContent"></div>
+  <button id="expandLeftBtn">Mở rộng sang trái</button>
+  <button id="addName">them name</button>
+</div>
+
+<script>
+
+  function insertStorage(key, newString) {
+    // Lấy chuỗi hiện tại từ localStorage (nếu có)
+    let currentString = localStorage.getItem(key) || "";
+
+    // Chèn chuỗi mới vào đầu và thêm \n
+    let updatedString = newString + "\n" + currentString;
+
+    // Lưu chuỗi đã cập nhật vào localStorage
+    localStorage.setItem(key, updatedString);
+  }
+
+  function capitalizeFirstChar(str) {
+    var words = str.split(' ');
+    for (var i = 0; i < words.length; i++) {
+      words[i] = words[i].charAt(0).toUpperCase() + words[i].slice(1);
+    }
+    return words.join(' ');
+  }
+
+  function showInfo(icon) {
+    var h = capitalizeFirstChar(icon.getAttribute('h'));
+    var t = icon.getAttribute('t');
+    var v = icon.getAttribute('v');
+    var p = icon.getAttribute('p');
+
+    var dialogContent = `<strong>Hán:</strong> ${t}<br>
+                         <strong>Việt:</strong> ${v}<br>
+                         <strong>Hán Việt:</strong> ${h}`;
+
+    var dialog = document.getElementById('dialog');
+    var dialogContentElement = document.getElementById('dialogContent');
+    dialogContentElement.innerHTML = dialogContent;
+    dialog.style.display = 'block';
+  }
+
+  function mergeIcons(clickedIcon) {
+    while (clickedIcon && clickedIcon.previousElementSibling) {
+      for (var i = 0; i < clickedIcon.attributes.length; i++) {
+        var attr = clickedIcon.attributes[i];
+        var existingAttr = clickedIcon.previousElementSibling.getAttribute(attr.name);
+        if ((attr.name === 'h' || attr.name === 'v') && existingAttr) {
+          attr.value = ' ' + attr.value;
+        }
+        var value = existingAttr ? existingAttr + attr.value : attr.value;
+        clickedIcon.previousElementSibling.setAttribute(attr.name, value);
+      }
+
+      clickedIcon.previousElementSibling.innerHTML += ` ${clickedIcon.innerHTML}`;
+      showInfo(clickedIcon.previousElementSibling);
+
+      clickedIcon.parentNode.removeChild(clickedIcon);
+      clickedIcon = clickedIcon.previousElementSibling;
+    }
+  }
+
+  document.querySelectorAll('#content i').forEach(function(icon) {
+    icon.addEventListener('click', function() {
+      document.querySelectorAll('#content i').forEach(function(item) {
+        item.classList.remove('clicked');
+      });
+
+      icon.classList.add('clicked');
+      showInfo(icon);
+    });
+  });
+
+  document.getElementById('expandLeftBtn').addEventListener('click', function() {
+    var clickedIcon = document.querySelector('.clicked');
+    mergeIcons(clickedIcon);
+  });
+
+  document.getElementById('addName').addEventListener('click', function() {
+    var clickedIcon = document.querySelector('.clicked');
+    if (clickedIcon) {
+      // Thêm thuộc tính 'h' vào localStorage khi click nút "Thêm Name"
+        var newNames = `${clickedIcon.getAttribute('t')}=${capitalizeFirstChar(clickedIcon.getAttribute('h'))}`;
+      insertStorage('VietPhrase', newNames);
+    }
+  });
+
+</script>
+
+</body>
+</html>
