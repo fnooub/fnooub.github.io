@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plain JavaScript Example</title>
+  <style>
+
+    button {
+      border: 1px solid black;
+    }
+  </style>
+</head>
+<body>
+<div class="menu">
+  <i hv="kiên trì" h="坚持" v="kiên trì/giữ vững/khăng khăng giữ">Kiên trì</i>
+  <i hv="nguyên sang" h="原创" v="bản gốc/nguyên sang/nguyên sang ">bản gốc</i>
+  <i hv="đỗ tuyệt" h="杜绝" v="ngăn chặn/tiêu diệt/diệt sạch/ngăn chặn tận gốc/khế ước đoạn mại/hợp đồng mua đứt bán đoạn/đỗ tuyệt/ngăn chặn đoạn tuyệt">ngăn chặn</i>
+  <i id="yourElementId" hv="vi quy" h="违规" v="làm trái quy tắc/vi quy/không tuân theo quy định/phạm quy/vi phạm quy lệ">làm trái quy tắc</i>
+  <i hv="thừa nặc" h="承诺" v="hứa hẹn/đồng ý làm/nhận lời làm/chấp thuận/cho phép/cam kết">hứa hẹn</i>
+  <i hv="thư" h="书" v="sách/thư/viết/Sách">sách</i>
+  <i hv="kiên trì" h="坚持" v="kiên trì/giữ vững/khăng khăng giữ">Kiên trì</i>
+  <i hv="nguyên sang" h="原创" v="bản gốc/nguyên sang/nguyên sang ">bản gốc</i>
+  <i hv="đỗ tuyệt" h="杜绝" v="ngăn chặn/tiêu diệt/diệt sạch/ngăn chặn tận gốc/khế ước đoạn mại/hợp đồng mua đứt bán đoạn/đỗ tuyệt/ngăn chặn đoạn tuyệt">ngăn chặn</i>
+  <i hv="vi quy" h="违规" v="làm trái quy tắc/vi quy/không tuân theo quy định/phạm quy/vi phạm quy lệ">làm trái quy tắc</i>
+  <i hv="thừa nặc" h="承诺" v="hứa hẹn/đồng ý làm/nhận lời làm/chấp thuận/cho phép/cam kết">hứa hẹn</i>
+  <i hv="thư" h="书" v="sách/thư/viết/Sách">sách</i>
+</div>
+<hr>
+<button onclick="preBtnHandle()"> <- </button>
+<button onclick="afterBtnHandle()"> -> </button>
+
+<script>
+  let menu;
+  let display = false;
+  let x = 0;
+  let y = 0;
+  let parent;
+  let current;
+  let pre;
+  let after;
+  let CVtext = 'a';
+
+  window.onload = function () {
+    menu = document.querySelector('.menu');
+    parent = document.getElementById('yourElementId');
+    current = parent;
+    pre = current.previousElementSibling;
+    after = current.nextElementSibling;
+
+    CVtext = current.textContent == null ? '' : current.textContent;
+    current.classList.add('focus');
+    console.log('onload:', CVtext);
+  };
+
+  function preBtnHandle() {
+    if (pre !== null) {
+      current = pre;
+      pre = current.previousElementSibling;
+      current.classList.add('focus');
+      CVtext = current.textContent + CVtext;
+      console.log('preBtnHandle:', CVtext);
+    }
+  }
+
+  function afterBtnHandle() {
+    if (after !== null) {
+      current = after;
+      after = current.nextElementSibling;
+      current.classList.add('focus');
+      CVtext = CVtext + current.textContent;
+      console.log('afterBtnHandle:', CVtext);
+    }
+  }
+
+  console.log('menu:', CVtext);
+</script>
+</body>
+</html>
