@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VietPhrase App</title>
+    <style>
+        #content *:not(.focus) {
+          all: initial;
+        }
+        #dialog {
+          position: absolute;
+          background-color: #17a2b8;
+          border: 1px solid #ccc;
+          padding: 10px;
+          width: 256px; /* Chiều rộng mong muốn */
+          display: none; /* Ẩn ban đầu */
+        }
+        .form input {
+            padding: 5px;
+        }
+      .form span {
+        width: 30px;
+        display: inline-block;
+      }
+.focus {
+    color: red;
+    font-weight: bold;
+}
+    </style>
+</head>
+
+<body>
+    <h1>VietPhrase App</h1>
+    <form id="translationForm">
+        <label for="textInput">Nhập văn bản tiếng Trung:</label>
+        <textarea id="textInput" name="text" rows="20" style="width: 100%;" required></textarea>
+        <button type="button" onclick="translateText()">Dịch</button>
+    </form>
+
+    <p id="content"></p>
+    <!-- Cửa sổ hiển thị thông tin -->
+    <div id="dialog">
+        <div class="form">
+          <span>HV:</span>
+          <input type="text" id="hv"><br>
+          <span>H:</span>
+          <input type="text" id="h"><br>
+
+          <span>V:</span>
+          <input type="text" id="v">
+        </div>
+        <hr>
+
+        <!-- Các nút điều khiển -->
+        <button id="preBtnHandle"> <- Trái </button>
+        <button id="afterBtnHandle"> Phải -> </button>
+        <button id="addName"> Thêm </button>
+        <button id="closeDialog"> Đóng </button>
+    </div>
+
+    <script>
+        async function translateText() {
+            const inputText = document.getElementById('textInput').value;
+            const response = await fetch('api/translate/edit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: inputText
+                }),
+            });
+            const data = await response.json();
+
+            const translationResult = data.translatedText;
+
+const result = translationResult.map(([h, v, hv, w]) => {
+    if (h === '\n') {
+        return '<br>';
+    } else if (h.trim() === '') {
+        return ' '; // Trả về khoảng trắng nếu là khoảng trắng
+    } else if (w === 1) {
+        return v;
+    } else {
+        return `<i hv="${hv}" h="${h}" v="${v}">${v.split('/')[0]}</i>`;
+    }
+}).join('');
+
+document.getElementById('content').innerHTML = result;
+
+//console.log(result);
+
+  // Các biến theo dõi trạng thái và dữ liệu của trang
+  let current;
+  let pre;
+  let after;
+  let dialog;
+  let hanviet;
+  let han;
+  let viet;
+  let repElements = [];
+
+  // thêm Names tại đây
+  const namedata = localStorage.getItem('VietPhrase') || '=';
+  console.log(namedata);
+
+  let namedatacache = null;
+
+  function replaceName(text) {
+    if (namedatacache) {
+      // Thực hiện thay thế từ cache nếu đã có
+      namedatacache.forEach(([pattern, replacement]) => {
+        text = text.replace(pattern, replacement);
+      });
+    } else {
+      // Nếu chưa có cache, tạo cache và thực hiện thay thế
+      namedatacache = [];
+
+      namedata.split("\n").forEach(line => {
+        const [pattern, replacement] = line.trim().split("=");
+        if (pattern && replacement) {
+          const regexPattern = new RegExp(pattern, "g");
+          namedatacache.push([regexPattern, replacement]);
+          text = text.replace(regexPattern, replacement);
+        }
+      });
+    }
+    return text;
+  }
+
+  function insertStorage(key, newString) {
+      // Lấy chuỗi hiện tại từ localStorage (nếu có)
+      let currentString = localStorage.getItem(key) || "";
+
+      // Chèn chuỗi mới vào đầu và thêm \n
+      let updatedString = newString + "\n" + currentString;
+
+      // Lưu chuỗi đã cập nhật vào localStorage
+      localStorage.setItem(key, updatedString);
+  }
+
+    // Lấy tham chiếu đến phần tử content và dialog
+    const content = document.getElementById('content');
+    dialog = document.getElementById('dialog');
+
+    // Sự kiện click cho phần tử content
+    content.addEventListener('click', function (event) {
+      // Xử lý khi phần tử <i> được nhấp vào
+      var element = event.target;
+      if (element.tagName === 'I') {
+        // Xóa lớp 'focus' khỏi các phần tử khác
+        document.querySelectorAll('i').forEach(el => {
+          if (el.classList.contains('focus')) {
+            el.classList.remove('focus');
+          }
+        });
+
+        // Đặt lại giá trị của repElements thành một mảng rỗng
+        repElements = [];
+
+        // Cập nhật các biến theo dõi
+        current = element;
+        pre = current.previousElementSibling;
+        after = current.nextElementSibling;
+        current.classList.add('focus');
+
+        // Lấy thông tin Hán Việt và Tiếng Hán của phần tử <i> được chọn
+        const hv = current.getAttribute('hv');
+        const h = current.getAttribute('h');
+        const v = current.getAttribute('v');
+
+        hanviet = hv || '';
+        han = h || '';
+        viet = v || '';
+
+        repElements.push({
+          hv: hv,
+          h: h
+        });
+
+        // Cập nhật và hiển thị dialog
+        updateDialogPosition();
+      }
+    });
+
+    document.getElementById('closeDialog').addEventListener('click', function () {
+      document.getElementById('dialog').style.display = 'none';
+    });
+    document.getElementById('afterBtnHandle').addEventListener('click', function () {
+      afterBtnHandle();
+    });
+    document.getElementById('preBtnHandle').addEventListener('click', function () {
+      preBtnHandle();
+    });
+    document.getElementById('addName').addEventListener('click', function () {
+        var newNames = `${han}=${hanviet}`;
+        insertStorage('VietPhrase', newNames);
+        replaceContent();
+        console.log(newNames);
+
+    });
+
+  // Hàm xử lý khi nhấn nút " <- "
+  function preBtnHandle() {
+    if (pre instanceof Element) {
+      // Cập nhật dữ liệu và vị trí của dialog khi điều hướng qua lại
+      current = pre;
+      pre = current.previousElementSibling;
+      current.classList.add('focus');
+
+      const hv = current.getAttribute('hv');
+      const h = current.getAttribute('h');
+      const v = current.getAttribute('v');
+      hanviet = hv + " " + hanviet;
+      han = h + han;
+      viet = v + " | " + viet;
+
+      repElements.push({
+        hv: hv,
+        h: h
+      });
+
+      console.log(repElements);
+
+      // Cập nhật và hiển thị dialog
+      updateDialogPosition();
+    }
+  }
+
+  // Hàm xử lý khi nhấn nút " -> "
+  function afterBtnHandle() {
+    if (after instanceof Element) {
+      // Cập nhật dữ liệu và vị trí của dialog khi điều hướng qua lại
+      current = after;
+      after = current.nextElementSibling;
+      current.classList.add('focus');
+
+      const hv = current.getAttribute('hv');
+      const h = current.getAttribute('h');
+      const v = current.getAttribute('v');
+      hanviet = hanviet + " " + hv;
+      han = han + h;
+      viet = viet + " | " + v;
+
+      repElements.push({
+        hv: hv,
+        h: h
+      });
+
+      // Cập nhật và hiển thị dialog
+      updateDialogPosition();
+    }
+  }
+
+  function addName() {
+    var newNames = `${han}=${hanviet}`;
+    insertStorage('VietPhrase', newNames);
+    replaceContent();
+    console.log(newNames);
+  }
+
+  // Hàm thực hiện thay thế nội dung của các phần tử <i>
+  function replaceContent() {
+    const iElements = document.querySelectorAll('#content i');
+
+    // Thay thế thông tin Hán Việt trong các phần tử được chọn
+    repElements.forEach(({ hv: replacementText, h: originalText }) => {
+      iElements.forEach((iElement) => {
+        if (iElement.getAttribute('h') === originalText) {
+          iElement.setAttribute('hv', replacementText);
+          iElement.innerHTML = capitalizeFirstChar(replacementText);
+          iElement.classList.add('focus');
+        }
+      });
+    });
+  }
+
+  // Hàm chuyển đổi ký tự đầu tiên của mỗi từ thành chữ hoa
+  function capitalizeFirstChar(str) {
+    var words = str.split(' ');
+    for (var i = 0; i < words.length; i++) {
+      words[i] = words[i].charAt(0).toUpperCase() + words[i].slice(1);
+    }
+    return words.join(' ');
+  }
+
+function updateDialogPosition() {
+  // Lấy giá trị từ các trường input
+  document.getElementById("hv").value = capitalizeFirstChar(hanviet);
+  document.getElementById("h").value = han;
+  document.getElementById("v").value = viet;
+
+  // Lấy thông tin về vị trí và kích thước của phần tử <i> được chọn
+  const topPosition = current.offsetTop;
+  const rect = current.getBoundingClientRect();
+
+  // Lấy chiều rộng của màn hình
+  const screenWidth = window.innerWidth;
+
+  // Xác định vị trí left ban đầu dựa trên vị trí của <i>
+  let leftPosition = rect.left;
+  const offsetWidth = 320;
+
+  // Kiểm tra xem nếu vị trí left + chiều rộng của dialog sẽ vượt quá mép phải của màn hình
+  if (leftPosition + offsetWidth > screenWidth) {
+    // Nếu có, đặt lại vị trí left sao cho nó không vượt quá mép phải
+    leftPosition = screenWidth - offsetWidth;
+  }
+
+  // Kiểm tra xem nếu vị trí left nhỏ hơn 0, đặt lại về 0 để tránh lấp vào mép trái của màn hình
+  if (leftPosition < 0) {
+    leftPosition = 0;
+  }
+
+  // Đặt vị trí của dialog dựa trên vị trí của <i> và vị trí top đã được tính toán
+  dialog.style.top = (topPosition + 25) + 'px';
+  dialog.style.left = leftPosition + 'px';
+
+  // Hiển thị dialog
+  dialog.style.display = 'block';
+}
+
+
+        }
+    </script>
+</body>
+
+</html>
