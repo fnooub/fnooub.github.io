@@ -2,6 +2,8 @@
 <html>
 <head>
     <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Phân tích</title>
 </head>
@@ -25,7 +27,7 @@ document.getElementById('phantich').addEventListener('click', async function() {
         const result = await searchWords(keywords);
         
         // Gọi hàm countRepeatWords và hiển thị kết quả trong div có id "ketqua"
-        const tuLap = countRepeatWords(result, 2, 5, 3, 10);
+        const tuLap = countRepeatWords(result, 1, 5, 3, 10);
         displayResult(tuLap);
     } catch (error) {
         // Xử lý lỗi nếu có
