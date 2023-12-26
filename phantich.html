@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Phân tích</title>
+</head>
+<body>
+<textarea id="inputText" placeholder="Nhập văn bản cần phân tích" rows="10" style="width: 100%"></textarea>
+<button id="phantich">Phân Tích</button>
+<div id="ketqua"></div>
+<script>
+async function main() {
+    // Không cần gọi hàm main() ở đây nếu bạn muốn chờ đến khi người dùng nhấn nút "Phân Tích"
+}
+
+// Lắng nghe sự kiện khi nút "Phân Tích" được nhấn
+document.getElementById('phantich').addEventListener('click', async function() {
+    try {
+        // Lấy giá trị từ textarea và tách thành mảng từ dấu phẩy
+        const inputText = document.getElementById('inputText').value;
+        const keywords = inputText.split(',').map(keyword => keyword.trim());
+        
+        // Gọi hàm searchWords với mảng từ khóa mới
+        const result = await searchWords(keywords);
+        
+        // Gọi hàm countRepeatWords và hiển thị kết quả trong div có id "ketqua"
+        const tuLap = countRepeatWords(result, 2, 5, 3, 10);
+        displayResult(tuLap);
+    } catch (error) {
+        // Xử lý lỗi nếu có
+        console.error('Main error:', error);
+    }
+});
+
+async function searchWords(keywords) {
+    try {
+        const response = await fetch('https://laongu.github.io/VietPhrase.txt');
+        const data = await response.text();
+
+        const lines = data.split('\n');
+        const foundWords = [];
+
+        keywords.forEach(keyword => {
+            const regex = new RegExp(keyword, 'i');
+            const matchingWords = lines
+                .filter(line => regex.test(line))
+                .map(line => {
+                    const [key, value] = line.split('=');
+                    return { keyword: key, value: value };
+                });
+
+            foundWords.push(...matchingWords);
+        });
+
+        return foundWords;
+    } catch (error) {
+        console.error('Fetch error:', error);
+        throw error;
+    }
+}
+
+function countRepeatWords(wordsArray, minWordLength = 2, maxWordLength = 5, minFrequency = 3, limit = 100) {
+    let wordFrequency = {};
+
+    for (let i = 0; i < wordsArray.length; i++) {
+        let text = wordsArray[i].keyword;
+
+        for (let j = 0; j < text.length; j++) {
+            for (let k = minWordLength; k <= maxWordLength; k++) {
+                if (j + k > text.length) continue;
+                let word = text.slice(j, j + k).trim();
+                if (word.length >= minWordLength) {
+                    if (wordFrequency[word]) {
+                        wordFrequency[word]++;
+                    } else {
+                        wordFrequency[word] = 1;
+                    }
+                }
+            }
+        }
+    }
+
+    let result = Object.entries(wordFrequency)
+        .filter(([word, frequency]) => frequency >= minFrequency)
+        .sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)
+        .slice(0, limit)
+        .map(([word, freq]) => ({ word, freq, value: wordsArray.find(item => item.keyword.includes(word)).value }));
+
+    return result;
+}
+
+function displayResult(result) {
+    const ketquaDiv = document.getElementById('ketqua');
+    ketquaDiv.innerHTML = '';
+
+    for (let i = 0; i < result.length; i++) {
+        const divElement = document.createElement('p');
+        divElement.textContent = `đếm: ${result[i].freq} => hán: ${result[i].word} => việt: ${result[i].value}`;
+        ketquaDiv.appendChild(divElement);
+    }
+}
+
+</script>
+</body>
+</html>
