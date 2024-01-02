@@ -43,10 +43,22 @@ class Dictionary {
                 const cachedContent = this.cachedData.get(fileName);
                 this.processLines(cachedContent, processLine);
             } else {
-                const response = await fetch(fileName);         // Fetch dữ liệu từ tệp trực tuyến
-                const fileContent = await response.text();      // Đọc nội dung tệp
-                this.cachedData.set(fileName, fileContent);     // Lưu vào cache để sử dụng lại sau này
-                this.processLines(fileContent, processLine);    // Xử lý từng dòng dữ liệu
+                const response = await fetch(fileName);
+                const reader = response.body.getReader(); // Sử dụng stream reader
+                let fileContent = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+
+                    if (done) {
+                        break;
+                    }
+
+                    fileContent += new TextDecoder().decode(value);
+                }
+
+                this.cachedData.set(fileName, fileContent);
+                this.processLines(fileContent, processLine);
             }
         } catch (error) {
             console.error('Lỗi đọc file từ điển:', error);
@@ -145,22 +157,22 @@ class Dictionary {
           // Cập nhật vị trí hiện tại
           currentIndex = lastFoundIndex + 1;
         } else {
-          // Nếu là ký tự Việt
-          if (!this.isTiengViet(text[currentIndex]) || ['\n'].includes(text[currentIndex])) {
+          // Nếu là ký tự Trung Quốc
+          if (this.isChineseCharacter(text[currentIndex])) {
             output.push(text[currentIndex]);
             currentIndex++;
           } else {
-            // Nếu không phải ký tự Việt và không có từ trong trie, ghép từ vào một biến tạm thời
-            let isVietNam = text[currentIndex];
+            // Nếu không phải ký tự Trung Quốc và không có từ trong trie, ghép từ vào một biến tạm thời
+            let nonChineseWord = text[currentIndex];
 
-            // Lặp để ghép những từ liên tiếp không phải ký tự Việt
-            while (currentIndex + 1 < text.length && this.isTiengViet(text[currentIndex + 1])) {
+            // Lặp để ghép những từ liên tiếp không phải ký tự Trung Quốc
+            while (currentIndex + 1 < text.length && !this.isChineseCharacter(text[currentIndex + 1])) {
               currentIndex++;
-              isVietNam += text[currentIndex];
+              nonChineseWord += text[currentIndex];
             }
 
-            // Thêm chuỗi từ không phải ký tự Việt vào kết quả
-            output.push(isVietNam);
+            // Thêm chuỗi từ không phải ký tự Trung Quốc vào kết quả
+            output.push(nonChineseWord);
 
             // Cập nhật vị trí hiện tại
             currentIndex++;
@@ -174,54 +186,47 @@ class Dictionary {
     // Phương thức kiểm tra xem một ký tự có phải là ký tự Trung Quốc hay không
     isChineseCharacter(char) {
         const charCode = char.charCodeAt(0);
-        return charCode >= 0x4E00 && charCode <= 0x9FFF;
-    }
-
-    isTiengViet(chuoi) {
-        // Biểu thức chính quy để kiểm tra chữ và số tiếng Việt
-        var regex = /^[a-zA-Z0-9\sàáạãảâầấậẫẩăằắặẵẳèéẹẽẻêềếệễểđìíịĩỉòóọõỏôồốộỗổơờớợỡởùúụũủưừứựữửỳýỵỹỷ]+$/;
-
-        // Kiểm tra chuỗi với biểu thức chính quy
-        return regex.test(chuoi);
+        return charCode >= 0x4E00 && charCode <= 0x9FFF || char ===  '\n';
     }
 
     // Phương thức chuyển đổi dấu câu Trung Quốc sang chữ La-tinh
     convertPunctuation(text) {
         const mapping = {
-            '。': '. ', '，': ', ', '、': ', ', '；': ';', '！': '!', '？': '?',
-            '：': ': ', '（': '(', '）': ')', '〔': '[', '〕': ']', '【': '[',
-            '】': ']', '《': '<', '》': '>', '｛': '{', '｝': '}', '『': '[',
-            '』': ']', '〈': '<', '〉': '>', '～': '~', '—': '-', '…': '...',
-            '〖': '[', '〗': ']', '〘': '[', '〙': ']', '〚': '[', '〛': ']', '　': ' '
-        };
+            "《": "⟨", "》": "⟩", "　": " ", "ˉ": "¯", "‥": "¨", "‧": "·", "•": "·", "‵": "`", "｀": "`",
+            "。": ".", "﹒": ".", "．": ".", "﹐": ",", "，": ",", "﹑": ",", "、": ",", "︰": ":", "∶": ":",
+            "﹔": ";", "；": ";", "﹕": ":", "：": ":", "﹖": "?", "？": "?", "﹗": "!", "！": "!", "﹙": "(",
+            "（": "(", "﹚": ")", "）": ")", "﹛": "{", "｛": "{", "﹜": "}", "｝": "}", "【": "[", "﹝": "[",
+            "［": "[", "】": "]", "﹞": "]", "］": "]", "＾": "^", "﹟": "#", "＃": "#", "﹠": "&", "＆": "&",
+            "﹡": "*", "＊": "*", "﹢": "+", "＋": "+", "﹣": "-", "－": "-", "﹤": "<", "＜": "<", "﹥": ">",
+            "＞": ">", "﹦": "=", "＝": "=", "﹩": "$", "＄": "$", "﹪": "%", "％": "%", "﹫": "@", "＠": "@",
+            "≒": "≈", "≦": "≤", "≧": "≥", "︱": "|", "｜": "|", "︳": "|", "︿": "∧", "﹀": "∨", "／": "/",
+            "＼": "\\", "╴": "_", "＿": "_", "「": "“", "」": "”", "『": "‘", "』": "’", "＂": "\"", "～": "~",
+            "｟": "(", "｠": ")", "ａ": "a", "ｂ": "b", "ｃ": "c", "ｄ": "d", "ｅ": "e", "ｆ": "f", "ｇ": "g",
+            "ｈ": "h", "ｉ": "i", "ｊ": "j", "ｋ": "k", "ｌ": "l", "ｍ": "m", "ｎ": "n", "ｏ": "o", "ｐ": "p",
+            "ｑ": "q", "ｒ": "r", "ｓ": "s", "ｔ": "t", "ｕ": "u", "ｖ": "v", "ｗ": "w", "ｘ": "x", "ｙ": "y",
+            "ｚ": "z", "Ａ": "A", "Ｂ": "B", "Ｃ": "C", "Ｄ": "D", "Ｅ": "E", "Ｆ": "F", "Ｇ": "G", "Ｈ": "H",
+            "Ｉ": "I", "Ｊ": "J", "Ｋ": "K", "Ｌ": "L", "Ｍ": "M", "Ｎ": "N", "Ｏ": "O", "Ｐ": "P", "Ｑ": "Q",
+            "Ｒ": "R", "Ｓ": "S", "Ｔ": "T", "Ｕ": "U", "Ｖ": "V", "Ｗ": "W", "Ｘ": "X", "Ｙ": "Y", "Ｚ": "Z",
+            "１": "1", "２": "2", "３": "3", "４": "4", "５": "5", "６": "6", "７": "7", "８": "8", "９": "9",
+            "０": "0"
+        }
 
         // Chuyển đổi từng ký tự trong văn bản dựa trên bảng ánh xạ
         return text.split('').map(char => mapping[char] || char).join('');
     }
 
     // Phương thức xử lý văn bản (loại bỏ khoảng trắng thừa, chuyển đổi chữ in hoa, v.v.)
-    processText(input) {
-        // Các biểu thức chính quy để xử lý văn bản
+    processText(text) {
         const trimSpacesBefore = / +([,.?!\]\>”’):])/g;
         const trimSpacesAfter = /([<\[“‘(]) +/g;
-        const capitalizeRegex = /(^\s*|[.!?“‘”’\[-]\s*)(\p{Ll})/gu;
-        const trimMultipleSpaces = / +/g;
+        const capitalizeRegex = /(^\s*|[.!?“‘”’\[-]\s*)(\p{Ll})/gmu;
+        const multipleSpaces = / +/g;
 
-        // Tách văn bản thành các dòng và loại bỏ khoảng trắng thừa
-        const lines = input.split('\n');
-        const processedLines = lines.map(line => line.trim());
+        const lines = text.split('\n').map(line => line.trim()).join('\n');
+        const trimmedLines = lines.replace(trimSpacesBefore, '$1').replace(trimSpacesAfter, '$1');
+        const processedText = trimmedLines.replace(capitalizeRegex, (_, p1, p2) => p1 + p2.toUpperCase());
+        const finalResult = processedText.replace(/[“‘”’]/g, '"').replace(multipleSpaces, ' ');
 
-        // Loại bỏ khoảng trắng thừa trước và sau dấu câu, chuyển đổi chữ in hoa
-        const trimmedStr1 = processedLines.join('\n').replace(trimSpacesBefore, '$1');
-        const trimmedStr2 = trimmedStr1.replace(trimSpacesAfter, '$1');
-
-        // Chuyển đổi chữ in hoa ở đầu mỗi câu
-        const processedText = trimmedStr2.replace(capitalizeRegex, (_, p1, p2) => p1 + p2.toUpperCase());
-
-        // Loại bỏ các dấu câu đặc biệt và thay thế nhiều khoảng trắng bằng một khoảng trắng
-        const finalResult = processedText.replace(/[“‘”’]/g, '"').replace(trimMultipleSpaces, ' ');
-
-        // Trả về văn bản đã xử lý
         return finalResult;
     }
 
@@ -230,15 +235,15 @@ class Dictionary {
         await this.loadDictionaries();
     }
 }
-/*
 
+/*
 // Hàm tự gọi khởi tạo đối tượng Dictionary và thực hiện dịch văn bản
 (async () => {
     const dictionary = new Dictionary();
     await dictionary.init(); // Tải toàn bộ từ điển
 
-    const inputText = '';
-    const translatedText = dictionary.tokenize(inputText); // Dịch văn bản
+    const inputText = '老五真帅气';
+    const translatedText = dictionary.translate(inputText); // Dịch văn bản
     console.log(translatedText); // In kết quả dịch ra console
 })();
 */
