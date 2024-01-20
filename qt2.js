@@ -193,8 +193,7 @@ class Dictionary {
     convertPunctuation(text) {
         const mapping = {
             '。': '. ', '，': ', ', '、': ', ', '；': ';', '！': '!', '？': '?',
-            '：': ': ', '（': ' (', '）': ') ', '｛': ' {', '｝': '} ', '…': '...',
-            '〖': ' [', '〗': '] ', '〘': ' [', '〙': '] ', '〚': ' [', '〛': '] ', '　': ' '
+            '：': ': ', '（': ' (', '）': ') ', '｛': ' {', '｝': '} ', '…': '...', '　': ' '
         };
 
         // Chuyển đổi từng ký tự trong văn bản dựa trên bảng ánh xạ
@@ -209,7 +208,7 @@ class Dictionary {
         const multipleSpaces = / +/g;
 
         const lines = text.split('\n').map(line => line.trim()).join('\n');
-        const trimmedLines = lines.replace(trimSpacesBefore, '$1').replace(trimSpacesAfter, '$1');
+        const trimmedLines = lines.replace(trimSpacesBefore, '$1 ').replace(trimSpacesAfter, ' $1');
         const processedText = trimmedLines.replace(capitalizeRegex, (_, p1, p2) => p1 + p2.toUpperCase());
         const finalResult = processedText.replace(/[“‘”’]/g, '"').replace(multipleSpaces, ' ');
 
