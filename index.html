@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Single Input to Multiple Outputs</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 50px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    input[type="text"] {
+      flex: 1;
+      padding: 10px;
+      margin-right: 10px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 16px;
+    }
+    .copy-btn {
+      padding: 10px 15px;
+      border: 1px solid #4CAF50;
+      background-color: #4CAF50;
+      color: white;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .copy-btn:hover {
+      background-color: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Single Input to Multiple Outputs</h2>
+    <form id="slugForm">
+      <div class="row">
+        <input type="text" id="mainInput" placeholder="Enter text here..." required>
+      </div>
+      <div class="row">
+        <input type="text" id="originalVideo" placeholder="Original Video" readonly>
+        <button type="button" class="copy-btn" onclick="copyToClipboard('originalVideo')">Copy</button>
+      </div>
+      <div class="row">
+        <input type="text" id="originalAudio" placeholder="Original Audio (slug)" readonly>
+        <button type="button" class="copy-btn" onclick="copyToClipboard('originalAudio')">Copy</button>
+      </div>
+      <div class="row">
+        <input type="text" id="originalScript" placeholder="Original Script" readonly>
+        <button type="button" class="copy-btn" onclick="copyToClipboard('originalScript')">Copy</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    function toSlug(str) {
+      // Chuyển hết sang chữ thường
+      str = str.toLowerCase();
+
+      // Xóa dấu
+      str = str.replace(/(à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ)/g, 'a');
+      str = str.replace(/(è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ)/g, 'e');
+      str = str.replace(/(ì|í|ị|ỉ|ĩ)/g, 'i');
+      str = str.replace(/(ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ)/g, 'o');
+      str = str.replace(/(ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ)/g, 'u');
+      str = str.replace(/(ỳ|ý|ỵ|ỷ|ỹ)/g, 'y');
+      str = str.replace(/(đ)/g, 'd');
+
+      // Xóa ký tự đặc biệt
+      str = str.replace(/[^a-z0-9]/g, ' ').trim();
+
+      // Loại bỏ khoảng trắng thừa và thay bằng dấu gạch ngang
+      return str.replace(/\s+/g, '_');
+    }
+
+    function copyToClipboard(elementId) {
+      const inputElement = document.getElementById(elementId);
+      inputElement.select();
+      inputElement.setSelectionRange(0, 99999); // Đảm bảo chọn trên các trình duyệt
+      navigator.clipboard.writeText(inputElement.value).then(() => {
+        // alert(`Copied: ${inputElement.value}`);
+      }).catch(err => {
+        alert('Failed to copy!');
+      });
+    }
+
+    const mainInput = document.getElementById('mainInput');
+    const originalVideo = document.getElementById('originalVideo');
+    const originalAudio = document.getElementById('originalAudio');
+    const originalScript = document.getElementById('originalScript');
+
+    mainInput.addEventListener('input', () => {
+      const text = mainInput.value.trim();
+      originalVideo.value = 'Original video - ' + text; // Gán trực tiếp văn bản gốc
+      originalAudio.value = 'Original audio - ' + toSlug(text); // Chuyển sang slug
+      originalScript.value = 'Original script - ' + text; // Gán văn bản gốc (tương tự video)
+    });
+  </script>
+</body>
+</html>
