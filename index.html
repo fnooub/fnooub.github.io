@@ -83,6 +83,10 @@
       return str.replace(/\s+/g, '_');
     }
 
+    function capitalizeFirstLetter(str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
     function copyToClipboard(elementId) {
       const inputElement = document.getElementById(elementId);
       inputElement.select();
@@ -101,9 +105,9 @@
 
     mainInput.addEventListener('input', () => {
       const text = mainInput.value.trim();
-      originalVideo.value = 'Original video - ' + text; // Gán trực tiếp văn bản gốc
+      originalVideo.value = 'Original video - ' + capitalizeFirstLetter(text); // Gán trực tiếp văn bản gốc
       originalAudio.value = 'Original audio - ' + toSlug(text); // Chuyển sang slug
-      originalScript.value = 'Original script - ' + text; // Gán văn bản gốc (tương tự video)
+      originalScript.value = 'Original script - ' + capitalizeFirstLetter(text); // Gán văn bản gốc (tương tự video)
     });
   </script>
 </body>
