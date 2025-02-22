@@ -10,13 +10,17 @@
         button { padding: 10px; cursor: pointer; margin-right: 10px; }
         #output { white-space: pre-wrap; background: #f4f4f4; padding: 10px; margin-top: 10px; }
         #wordCount { font-weight: bold; color: #007bff; }
+        #copyMessage { color: green; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
     <h2>Clean Summary Text Tool</h2>
     <textarea id="inputText" placeholder="Nhập văn bản cần xử lý..."></textarea>
     <button onclick="copyText()">Copy văn bản</button>
-    
+
+    <!-- Thông báo khi copy thành công -->
+    <div id="copyMessage"></div>
+
     <h3>Kết quả:</h3>
     <div><strong>Số từ:</strong> <span id="wordCount">0</span></div>
     <div id="output"></div>
@@ -33,7 +37,7 @@
             // Loại bỏ link YouTube
             text = text.replace(/https:\/\/www\.youtube\.com\/watch\?v=[^\s]+/g, "");
 
-            // Loại bỏ từ "Transcript:" nếu có
+            // Loại bỏ từ "Transcript:"
             text = text.replace(/Transcript:/gi, "");
 
             // Loại bỏ " - YouTube"
@@ -42,11 +46,11 @@
             // Loại bỏ "[Music]" và các hiệu ứng âm thanh khác
             text = text.replace(/\[Music\]|\[Laughter\]|\[Applause\]|\[Background noise\]/gi, "");
 
-            // Loại bỏ khoảng trắng thừa **NHƯNG giữ lại xuống dòng**
-            text = text.replace(/[^\S\r\n]+/g, " "); // Chỉ thay thế khoảng trắng mà KHÔNG động vào `\n`
+            // Loại bỏ khoảng trắng thừa
+            text = text.trim().replace(/\s+/g, " ");
 
-            // Đếm số từ **Dựa trên khoảng trắng nhưng không làm mất dòng trống**
-            let wordCount = text.trim().split(/\s+/).filter(word => word.length > 0).length;
+            // Đếm số từ
+            let wordCount = text.length > 0 ? text.split(/\s+/).length : 0;
 
             // Hiển thị kết quả
             document.getElementById("wordCount").textContent = wordCount;
@@ -61,7 +65,21 @@
             textArea.select();
             document.execCommand("copy");
             document.body.removeChild(textArea);
-            alert("Đã copy văn bản!");
+
+            // Lấy 5 từ đầu tiên của văn bản
+            let firstFiveWords = textArea.value.split(/\s+/).slice(0, 5).join(" ");
+            if (firstFiveWords.length > 0) {
+                firstFiveWords += "...";
+            }
+
+            // Hiển thị thông báo thay vì alert
+            let messageDiv = document.getElementById("copyMessage");
+            messageDiv.textContent = `✅ Văn bản đã được sao chép! (${firstFiveWords})`;
+            
+            // Ẩn thông báo sau 3 giây
+            setTimeout(() => {
+                messageDiv.textContent = "";
+            }, 3000);
         }
     </script>
 </body>
