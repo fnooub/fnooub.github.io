@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phân Tích Video YouTube</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
+        input { padding: 10px; width: 60%; margin-bottom: 10px; }
+        button { padding: 10px 15px; cursor: pointer; }
+        #result { margin-top: 20px; text-align: left; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        img { max-width: 100%; height: auto; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h2>Nhập ID Video YouTube để lấy dữ liệu</h2>
+    <input type="text" id="videoId" placeholder="Nhập ID hoặc URL video (ví dụ: dQw4w9WgXcQ)">
+    <button onclick="getYouTubeVideoData()">Lấy Dữ Liệu</button>
+    <div id="result"></div>
+
+    <script>
+        const apiKey = "";  // Thay bằng API key của bạn
+        let categoryMap = {};
+
+        async function fetchCategories() {
+            const url = `https://www.googleapis.com/youtube/v3/videoCategories?part=snippet&regionCode=US&key=${apiKey}`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                data.items.forEach(item => {
+                    categoryMap[item.id] = item.snippet.title;
+                });
+            } catch (error) {
+                console.error("Lỗi khi lấy danh mục:", error);
+            }
+        }
+
+        function formatDuration(duration) {
+            const match = duration.match(/PT(\d+H)?(\d+M)?(\d+S)?/);
+            if (!match) return "Không xác định";
+            const hours = match[1] ? match[1].replace("H", "") : "0";
+            const minutes = match[2] ? match[2].replace("M", "") : "0";
+            const seconds = match[3] ? match[3].replace("S", "") : "0";
+            return `${hours !== "0" ? hours + ":" : ""}${minutes.padStart(2, "0")}:${seconds.padStart(2, "0")}`;
+        }
+
+        function extractVideoId(input) {
+            const regex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+            const match = input.match(regex);
+            return match ? match[1] : input;
+        }
+
+        function parseKeywords(keywordString) {
+            if (!keywordString) return "Không có từ khóa";
+
+            const parsed = [];
+            let word = "";
+            let inQuotes = false;
+
+            for (let i = 0; i < keywordString.length; i++) {
+                const char = keywordString.charAt(i);
+
+                if (char === '"' && !inQuotes) {
+                    inQuotes = true;
+                } else if (char === '"' && inQuotes) {
+                    inQuotes = false;
+                }
+
+                if (char !== '"') {
+                    if (char === " " && !inQuotes) {
+                        if (word) parsed.push(word);
+                        word = "";
+                    } else {
+                        word += char;
+                    }
+                }
+            }
+            if (word && parsed.indexOf(word) === -1) parsed.push(word);
+
+            return parsed.length ? parsed.join(", ") : "Không có từ khóa";
+        }
+
+        async function getChannelData(channelId) {
+            const url = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,brandingSettings&id=${channelId}&key=${apiKey}`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.items.length === 0) {
+                    return `<p>Không tìm thấy thông tin kênh!</p>`;
+                }
+
+                const channel = data.items[0];
+                const channelTitle = channel.snippet.title;
+                const channelDescription = channel.snippet.description;
+                const channelThumbnail = channel.snippet.thumbnails.high.url;
+                const subscriberCount = channel.statistics.subscriberCount || "Không công khai";
+                const videoCount = channel.statistics.videoCount;
+                const viewCount = channel.statistics.viewCount;
+                const rawKeywords = channel.brandingSettings?.channel?.keywords || "";
+                const keywords = parseKeywords(rawKeywords);
+                const creationDate = channel.snippet.publishedAt;
+
+                return `
+                    <h3>Thông Tin Kênh</h3>
+                    <table>
+                        <tr><th>Tên kênh</th><td>${channelTitle}</td></tr>
+                        <tr><th>Ngày tạo</th><td>${creationDate}</td></tr>
+                        <tr><th>Lượt đăng ký</th><td>${subscriberCount}</td></tr>
+                        <tr><th>Tổng lượt xem</th><td>${viewCount}</td></tr>
+                        <tr><th>Tổng số video</th><td>${videoCount}</td></tr>
+                        <tr><th>Mô tả</th><td>${channelDescription}</td></tr>
+                        <tr><th>Từ khóa</th><td>${keywords}</td></tr>
+                    </table>
+                    <img src="${channelThumbnail}" alt="Hình ảnh kênh">
+                    <p><a href="https://www.youtube.com/channel/${channelId}" target="_blank">Xem kênh</a></p>
+                `;
+            } catch (error) {
+                console.error("Lỗi khi lấy dữ liệu kênh:", error);
+                return `<p>Lỗi khi lấy thông tin kênh!</p>`;
+            }
+        }
+
+        async function getYouTubeVideoData() {
+            let input = document.getElementById("videoId").value.trim();
+            const videoId = extractVideoId(input);
+
+            if (!videoId || videoId.length !== 11) {
+                alert("Vui lòng nhập ID hoặc URL hợp lệ!");
+                return;
+            }
+
+            const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics,status&id=${videoId}&key=${apiKey}`;
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.items.length === 0) {
+                    document.getElementById("result").innerHTML = "<p>Không tìm thấy video!</p>";
+                    return;
+                }
+
+                const video = data.items[0];
+                const title = video.snippet.title;
+                const channelId = video.snippet.channelId;
+                const publishedAtVN = new Date(video.snippet.publishedAt).toLocaleString("vi-VN", { timeZone: "Asia/Bangkok" });
+                const publishedAtUS = new Date(video.snippet.publishedAt).toLocaleString("en-US", { timeZone: "America/New_York" });
+                const views = video.statistics.viewCount;
+                const likes = video.statistics.likeCount || 0;
+                const comments = video.statistics.commentCount || 0;
+                const duration = formatDuration(video.contentDetails.duration);
+                const category = categoryMap[video.snippet.categoryId] || "";
+                const description = video.snippet.description;
+                const language = video.snippet.defaultAudioLanguage || "";
+                const tags = video.snippet.tags ? video.snippet.tags.join(", ") : "";
+                const thumbnail = video.snippet.thumbnails.maxres?.url || video.snippet.thumbnails.high.url;
+                const madeForKids = video.status.madeForKids ? "Có" : "Không";
+                const caption = video.contentDetails.caption === "true" ? "Video có phụ đề" : "Video không có phụ đề.";
+
+                const channelInfo = await getChannelData(channelId);
+
+                document.getElementById("result").innerHTML = `
+                    <h3>Thông Tin Video</h3>
+                    <table>
+                        <tr><th>Tiêu đề</th><td>${title}</td></tr>
+                        <tr><th>Ngày tải lên (VN)</th><td>${publishedAtVN}</td></tr>
+                        <tr><th>Ngày tải lên (US)</th><td>${publishedAtUS}</td></tr>
+                        <tr><th>Lượt xem</th><td>${views}</td></tr>
+                        <tr><th>Lượt thích</th><td>${likes}</td></tr>
+                        <tr><th>Bình luận</th><td>${comments}</td></tr>
+                        <tr><th>Thời lượng</th><td>${duration}</td></tr>
+                        <tr><th>Danh mục</th><td>${category}</td></tr>
+                        <tr><th>Ngôn ngữ</th><td>${language}</td></tr>
+                        <tr><th>Thẻ</th><td>${tags}</td></tr>
+                        <tr><th>Mô tả</th><td>${description}</td></tr>
+                    </table>
+                    <img src="${thumbnail}" alt="Thumbnail">
+                    <iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe>
+                    ${channelInfo}
+                `;
+            } catch (error) {
+                console.error("Lỗi khi lấy dữ liệu:", error);
+                document.getElementById("result").innerHTML = "<p>Lỗi khi lấy dữ liệu!</p>";
+            }
+        }
+
+        fetchCategories();
+    </script>
+</body>
+</html>
