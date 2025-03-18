@@ -10,6 +10,7 @@
         button { padding: 10px; cursor: pointer; margin-right: 10px; }
         #output { white-space: pre-wrap; background: #f4f4f4; padding: 10px; margin-top: 10px; }
         #wordCount { font-weight: bold; color: #007bff; }
+        #timeEstimate { font-weight: bold; color: #28a745; margin-left: 20px; }
         #copyMessage { color: green; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
@@ -22,7 +23,10 @@
     <div id="copyMessage"></div>
 
     <h3>Kết quả:</h3>
-    <div><strong>Số từ:</strong> <span id="wordCount">0</span></div>
+    <div>
+        <strong>Số từ:</strong> <span id="wordCount">0</span>
+        <span id="timeEstimate"></span> <!-- Thêm phần hiển thị thời gian -->
+    </div>
     <div id="output"></div>
 
     <script>
@@ -52,8 +56,13 @@
             // Đếm số từ
             let wordCount = text.length > 0 ? text.split(/\s+/).length : 0;
 
+            // Tính thời gian trung bình (dùng 148 từ/phút)
+            let minutes = wordCount > 0 ? (wordCount / 148).toFixed(2) : 0;
+            let timeDisplay = wordCount > 0 ? `Dự đoán: ~${minutes} phút (11labs brian speed 0.93)` : "";
+
             // Hiển thị kết quả
             document.getElementById("wordCount").textContent = wordCount;
+            document.getElementById("timeEstimate").textContent = timeDisplay;
             document.getElementById("output").textContent = text;
         }
 
