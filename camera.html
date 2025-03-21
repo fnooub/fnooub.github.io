@@ -1,28 +1,47 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8"> <!-- Thiết lập mã hóa ký tự UTF-8 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Responsive design -->
     <title>Prompt Generator</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        button { margin: 5px; padding: 10px; cursor: pointer; }
-        textarea { width: 100%; height: 150px; margin-top: 20px; font-size: 16px; }
+        body { font-family: Arial, sans-serif; padding: 20px; } /* Style cơ bản cho body */
+        button { margin: 5px; padding: 10px; cursor: pointer; } /* Style cho các nút */
+        textarea { width: 100%; height: 150px; margin-top: 20px; font-size: 16px; } /* Style cho textarea */
+        #notification.success { background-color: #dff0d8; color: #3c763d; border: 1px solid #d6e9c6; } /* Style thông báo thành công */
+        #notification.error { background-color: #f2dede; color: #a94442; border: 1px solid #ebccd1; } /* Style thông báo lỗi */
+        #fixedPromptSection { /* Style cho phần cố định */
+            position: fixed; /* Cố định vị trí */
+            top: 20px; /* Cách đỉnh 20px */
+            left: 20px; /* Cách trái 20px */
+            right: 20px; /* Cách phải 20px */
+            background-color: #fff; /* Nền trắng */
+            z-index: 1000; /* Đặt trên các phần tử khác */
+            padding: 10px; /* Khoảng cách bên trong */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2); /* Thêm bóng */
+        }
+        #buttonContainer { /* Đẩy container nút xuống */
+            margin-top: 300px; /* Khoảng cách để tránh chồng lấn */
+        }
     </style>
 </head>
 <body>
+    <h2>Chọn các yếu tố để tạo Prompt</h2> <!-- Tiêu đề chính -->
 
-    <h2>Chọn các yếu tố để tạo Prompt</h2>
+    <div id="fixedPromptSection"> <!-- Phần cố định -->
+        <h3>Prompt của bạn</h3> <!-- Tiêu đề cho phần prompt -->
+        <textarea id="promptTextarea" placeholder="Prompt sẽ xuất hiện ở đây..."></textarea> <!-- Ô nhập prompt -->
+        <button onclick="clearPrompt()">Xóa Prompt</button> <!-- Nút xóa nội dung prompt -->
+        <button onclick="copyPrompt()">Sao chép</button> <!-- Nút sao chép prompt -->
+        <div id="notification" style="display: none; margin-top: 10px; padding: 10px; border-radius: 5px;"></div> <!-- Khu vực hiển thị thông báo -->
+    </div>
 
+    <div id="buttonContainer"></div> <!-- Container cho các nút lựa chọn -->
 
-    <h3>Prompt của bạn</h3>
-    <textarea id="promptTextarea" placeholder="Prompt sẽ xuất hiện ở đây..." readonly></textarea>
-    <button onclick="clearPrompt()">Xóa Prompt</button>
-
-    <div id="buttonContainer"></div>
     <script>
+        // Dữ liệu các danh mục và lựa chọn
         const data = {
-            "subject_direction": {
+            "subject_direction": { // Hướng của đối tượng
                 "Centered": "Đối tượng nằm giữa khung hình",
                 "Side Profile": "Góc nghiêng, nhìn từ bên cạnh",
                 "Back View": "Nhìn từ phía sau",
@@ -30,35 +49,35 @@
                 "Back Three Quarter View": "Góc 3/4 từ phía sau",
                 "Looking Over the Shoulder": "Nhìn qua vai"
             },
-            "camera_angle": {
+            "camera_angle": { // Góc máy quay
                 "Low Angle Shot": "Chụp từ dưới lên, tạo cảm giác mạnh mẽ",
                 "High Angle Shot": "Chụp từ trên xuống, tạo cảm giác nhỏ bé",
                 "Overhead Shot": "Chụp từ trên xuống 90°, tạo bố cục độc đáo",
                 "Bird’s Eye View": "Góc nhìn từ trên cao rộng hơn, nhìn từ trên trời",
                 "Fish-Eye Shot": "Góc siêu rộng, biến dạng hình ảnh"
             },
-            "camera_shot": {
+            "camera_shot": { // Kiểu cảnh quay
                 "Close Up Shot": "Cận cảnh, tập trung vào khuôn mặt hoặc chi tiết nhỏ",
                 "Medium Shot": "Chụp nửa người, thể hiện cảm xúc và bối cảnh",
                 "Full Body Shot": "Chụp toàn thân, lấy trọn vẹn nhân vật",
                 "Long Shot": "Chụp xa, nhân vật trong bối cảnh rộng",
                 "Extreme Long Shot": "Cực xa, nhân vật rất nhỏ trong cảnh lớn"
             },
-            "camera_lens": {
+            "camera_lens": { // Loại ống kính
                 "Macro Lens": "Ống kính macro, chụp cận cảnh chi tiết nhỏ",
                 "Fish-Eye Lens": "Ống kính mắt cá, tạo hiệu ứng cong",
                 "Tilt-Shift Lens": "Tạo hiệu ứng mô hình thu nhỏ",
                 "Cracked Lens": "Hiệu ứng kính vỡ",
                 "Infrared Camera": "Ảnh hồng ngoại, tạo màu sắc độc đáo"
             },
-            "frame_in_frame": {
+            "frame_in_frame": { // Khung trong khung
                 "Looking Through a Window": "Nhìn qua cửa sổ",
                 "Through a Telescope": "Nhìn qua kính viễn vọng",
                 "Airplane Window": "Nhìn qua cửa sổ máy bay",
                 "Small Rectangular Opening": "Nhìn qua khung cửa nhỏ",
                 "Circular Frame": "Khung hình tròn"
             },
-            "landscapes": {
+            "landscapes": { // Phong cảnh
                 "Low Angle Landscape": "Chụp phong cảnh từ dưới lên",
                 "High Angle Landscape": "Chụp phong cảnh từ trên xuống",
                 "Bird’s Eye View": "Góc nhìn từ trên cao, bao quát khu vực rộng",
@@ -68,39 +87,65 @@
             }
         };
 
+        // Tạo các nút từ dữ liệu
         function generateButtons() {
-            let container = document.getElementById("buttonContainer");
-
-            for (const category in data) {
-                let section = document.createElement("div");
-                section.innerHTML = `<h3>${category.replace(/_/g, ' ').toUpperCase()}</h3>`;
+            let container = document.getElementById("buttonContainer"); // Lấy container
+            for (const category in data) { // Duyệt qua từng danh mục
+                let section = document.createElement("div"); // Tạo div cho mỗi danh mục
+                section.innerHTML = `<h3>${category.replace(/_/g, ' ').toUpperCase()}</h3>`; // Tạo tiêu đề danh mục
                 
-                for (const key in data[category]) {
-                    let btn = document.createElement("button");
-                    btn.textContent = data[category][key];
-                    btn.onclick = () => addToPrompt(key);
-                    section.appendChild(btn);
+                for (const key in data[category]) { // Duyệt qua từng lựa chọn trong danh mục
+                    let btn = document.createElement("button"); // Tạo nút
+                    btn.textContent = data[category][key]; // Gán nội dung cho nút
+                    btn.onclick = () => addToPrompt(key); // Gắn sự kiện click
+                    section.appendChild(btn); // Thêm nút vào section
                 }
-
-                container.appendChild(section);
+                container.appendChild(section); // Thêm section vào container
             }
         }
 
+        // Thêm text vào prompt
         function addToPrompt(text) {
-            let textarea = document.getElementById("promptTextarea");
-            if (textarea.value) {
-                textarea.value += ", " + text; 
-            } else {
-                textarea.value = text; 
+            let textarea = document.getElementById("promptTextarea"); // Lấy textarea
+            if (textarea.value) { // Nếu đã có nội dung
+                textarea.value += ", " + text; // Thêm text với dấu phẩy
+            } else { // Nếu chưa có nội dung
+                textarea.value = text; // Chỉ thêm text
             }
         }
 
+        // Xóa nội dung prompt
         function clearPrompt() {
-            document.getElementById("promptTextarea").value = "";
+            document.getElementById("promptTextarea").value = ""; // Đặt giá trị textarea về rỗng
         }
 
-        generateButtons();
-    </script>
+        // Sao chép nội dung prompt vào clipboard
+        function copyPrompt() {
+            let textarea = document.getElementById("promptTextarea"); // Lấy textarea
+            let notification = document.getElementById("notification"); // Lấy div thông báo
+            
+            textarea.select(); // Chọn toàn bộ nội dung trong textarea
+            navigator.clipboard.writeText(textarea.value) // Sao chép vào clipboard
+                .then(() => { // Khi sao chép thành công
+                    notification.textContent = "Đã sao chép prompt vào clipboard!";
+                    notification.className = "success"; // Áp dụng style thành công
+                    notification.style.display = "block"; // Hiển thị thông báo
+                    setTimeout(() => { // Ẩn thông báo sau 2 giây
+                        notification.style.display = "none";
+                    }, 2000);
+                })
+                .catch(err => { // Khi sao chép thất bại
+                    notification.textContent = "Không thể sao chép prompt!";
+                    notification.className = "error"; // Áp dụng style lỗi
+                    notification.style.display = "block"; // Hiển thị thông báo
+                    console.error("Lỗi khi sao chép: ", err); // Ghi lỗi vào console
+                    setTimeout(() => { // Ẩn thông báo sau 2 giây
+                        notification.style.display = "none";
+                    }, 2000);
+                });
+        }
 
+        generateButtons(); // Gọi hàm tạo nút khi trang được tải
+    </script>
 </body>
 </html>
