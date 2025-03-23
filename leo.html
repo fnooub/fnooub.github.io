@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Process LocalStorage Data with Images</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    textarea {
+      width: 100%;
+      height: 150px;
+      margin-bottom: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    button {
+      padding: 5px 10px;
+      margin: 5px 5px 0 0;
+      cursor: pointer;
+    }
+    img {
+      max-width: 200px;
+      height: auto;
+      display: block;
+    }
+    .highlighted {
+      background-color: #ffcccc;
+    }
+    .delete-btn {
+      background-color: #f44336;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+  <h1>Process LocalStorage Data with Images</h1>
+  <p>Dán dữ liệu JSON từ localStorage hoặc file JSON tải về vào đây:</p>
+  <textarea id="inputData" placeholder="Dán JSON từ clipboard (ví dụ: JSON.parse(localStorage.getItem('leonardo_processed_images'))) hoặc từ file JSON tải về"></textarea>
+  <button onclick="processData()">Xử lý dữ liệu</button>
+  <button onclick="clearTable()">Xóa bảng</button>
+
+  <h2>Danh sách ảnh và prompt</h2>
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th>Ảnh</th>
+        <th>Prompt</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+  <script>
+    let processedData = [];
+    let highlightedRows = [];
+    const STORAGE_KEY = 'leonardo_processed_images';
+
+    function getStoredData() {
+      const storedData = localStorage.getItem(STORAGE_KEY);
+      return storedData ? JSON.parse(storedData) : { images: [], highlightedRows: [] };
+    }
+
+    function saveStoredData(images, highlightedRows) {
+      const data = { images, highlightedRows };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+
+    function displayData(images, highlightedRows) {
+      const tableBody = document.getElementById('tableBody');
+      tableBody.innerHTML = '';
+
+      images.forEach((item, index) => {
+        if (item.imageUrl && item.prompt) {
+          const isHighlighted = highlightedRows.includes(item.imageUrl);
+          const row = document.createElement('tr');
+          row.dataset.imageUrl = item.imageUrl;
+          row.className = isHighlighted ? 'highlighted' : '';
+          row.innerHTML = `
+            <td>
+              <img src="${item.imageUrl}" alt="Image" onerror="this.src='https://via.placeholder.com/200?text=Image+Not+Found';">
+              <button onclick="copyToClipboard('${item.imageUrl}', 'URL copied!')">Sao chép URL</button>
+            </td>
+            <td>
+              ${item.prompt}
+              <br>
+              <button onclick='copyPromptAndHighlight(${JSON.stringify(item.prompt)}, this, ${JSON.stringify(item.imageUrl)})'>Sao chép Prompt</button>
+            </td>
+            <td>
+              <button class="delete-btn" onclick="deleteItem(${index})">Xoá</button>
+            </td>
+          `;
+          tableBody.appendChild(row);
+        }
+      });
+    }
+
+    function processData() {
+      const input = document.getElementById('inputData').value.trim();
+      if (!input) {
+        alert("Vui lòng dán dữ liệu JSON trước khi xử lý!");
+        return;
+      }
+
+      try {
+        const parsedInput = JSON.parse(input);
+        if (Array.isArray(parsedInput)) {
+          processedData = parsedInput;
+          highlightedRows = [];
+        } else if (parsedInput.images && Array.isArray(parsedInput.images)) {
+          processedData = parsedInput.images;
+          highlightedRows = parsedInput.highlightedRows || [];
+        } else {
+          throw new Error("Dữ liệu không đúng định dạng!");
+        }
+
+        displayData(processedData, highlightedRows);
+        saveStoredData(processedData, highlightedRows);
+        alert("Dữ liệu đã được xử lý và lưu vào localStorage!");
+      } catch (error) {
+        alert("Lỗi: Vui lòng kiểm tra định dạng JSON! " + error.message);
+      }
+    }
+
+    function clearTable() {
+      document.getElementById('tableBody').innerHTML = '';
+      processedData = [];
+      highlightedRows = [];
+      document.getElementById('inputData').value = '';
+      localStorage.removeItem(STORAGE_KEY);
+      //alert("Bảng đã được xóa!");
+    }
+
+    function copyToClipboard(text, successMessage) {
+      navigator.clipboard.writeText(text)
+        .then(() => console.log(successMessage)) // Thay alert bằng log
+        .catch(err => console.error("Lỗi khi sao chép văn bản!", err));
+    }
+
+    function copyPromptAndHighlight(prompt, button, imageUrl) {
+      copyToClipboard(prompt, 'Prompt copied!');
+      const row = button.closest('tr');
+      row.classList.add('highlighted');
+      if (!highlightedRows.includes(imageUrl)) {
+        highlightedRows.push(imageUrl);
+        saveStoredData(processedData, highlightedRows);
+      }
+    }
+
+    function deleteItem(index) {
+      if (confirm("Bạn có chắc muốn xoá mục này không?")) {
+        const removedItem = processedData.splice(index, 1)[0];
+        highlightedRows = highlightedRows.filter(url => url !== removedItem.imageUrl);
+        displayData(processedData, highlightedRows);
+        saveStoredData(processedData, highlightedRows);
+        //alert("Đã xoá mục.");
+      }
+    }
+
+    window.addEventListener('load', () => {
+      const storedData = getStoredData();
+      if (storedData.images && storedData.images.length > 0) {
+        processedData = storedData.images;
+        highlightedRows = storedData.highlightedRows || [];
+        displayData(processedData, highlightedRows);
+        //alert("Đã tải dữ liệu từ localStorage!");
+      }
+    });
+  </script>
+</body>
+</html>
