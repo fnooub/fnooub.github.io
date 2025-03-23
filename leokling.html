@@ -121,13 +121,26 @@
     function processData() {
       const input = document.getElementById('inputData').value.trim();
       if (!input) return showToast("Vui lòng dán JSON!");
+
       try {
         const parsed = JSON.parse(input);
         const newItems = Array.isArray(parsed) ? parsed : parsed.images || [];
-        processedData = processedData.concat(newItems);
+
+        // Bộ tập hợp các URL đã có
+        const existingUrls = new Set(processedData.map(item => item.imageUrl));
+
+        // Lọc ra ảnh chưa tồn tại
+        const uniqueNewItems = newItems.filter(item => !existingUrls.has(item.imageUrl));
+
+        if (uniqueNewItems.length === 0) {
+          showToast("Tất cả ảnh đã tồn tại!");
+          return;
+        }
+
+        processedData = processedData.concat(uniqueNewItems);
         saveToFirebase(processedData, highlightedRows);
         displayData(processedData, highlightedRows);
-        showToast("Đã nối & lưu Firebase!");
+        showToast(`Đã thêm ${uniqueNewItems.length} ảnh mới!`);
       } catch (e) {
         showToast("JSON không hợp lệ!");
       }
