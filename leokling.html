@@ -15,6 +15,8 @@
     button { padding: 5px 10px; margin: 5px 5px 0 0; cursor: pointer; }
     img { max-width: 200px; height: auto; display: block; cursor: zoom-in; }
     .highlighted { background-color: #ffcccc; }
+    .hover-highlight { background-color: #ffffcc !important; }
+    .active-row { outline: 3px solid gold; }
     .delete-btn { background-color: #f44336; color: white; }
     .prompt-text { max-height: none; overflow: visible; }
     @media (max-width: 768px) {
@@ -57,25 +59,64 @@
       z-index: 9999;
       justify-content: center;
       align-items: center;
+      flex-direction: column;
     }
     #zoomOverlay img {
       max-width: 100vw;
-      max-height: 100vh;
+      max-height: 90vh;
       object-fit: contain;
       cursor: zoom-out;
+    }
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .nav-button {
+      pointer-events: all;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: none;
+      font-size: 2em;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    #copyPromptOverlayBtn {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 0.9);
+      color: black;
+      border: none;
+      font-size: 1.2em;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      z-index: 10000;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    #copyPromptOverlayBtn.copied {
+      background-color: #4CAF50 !important;
+      color: white;
     }
   </style>
 </head>
 <body>
   <h1>Process Image Prompts with Firebase</h1>
   <textarea id="inputData" placeholder="Dán JSON tại đây..."></textarea>
-  <button onclick="processData()">Nối dữ liệu mới</button>
-  <button onclick="clearTable()">Xoá bảng</button>
+  <button id="processDataBtn">Nối dữ liệu mới</button>
+  <button id="clearTableBtn">Xoá bảng</button>
 
   <h2>Danh sách ảnh và prompt</h2>
   <table id="dataTable">
     <thead>
       <tr>
+        <th>STT</th>
         <th>Ảnh</th>
         <th>Prompt</th>
         <th>Hành động</th>
@@ -85,7 +126,14 @@
   </table>
 
   <div id="toast"></div>
-  <div id="zoomOverlay" onclick="closeZoom()"><img src="" alt="Zoomed Image"></div>
+  <div id="zoomOverlay">
+    <button id="copyPromptOverlayBtn">📋 Sao chép Prompt</button>
+    <div class="nav-buttons">
+      <button class="nav-button" id="prevImageBtn">←</button>
+      <button class="nav-button" id="nextImageBtn">→</button>
+    </div>
+    <img src="" alt="Zoomed Image">
+  </div>
 
   <script>
     const firebaseConfig = {
@@ -104,6 +152,7 @@
 
     let processedData = [];
     let highlightedRows = [];
+    let currentIndex = -1;
 
     function showToast(message) {
       const toast = document.getElementById("toast");
@@ -119,24 +168,42 @@
         if (item.imageUrl && item.prompt) {
           const isHighlighted = highlightedRows.includes(item.imageUrl);
           const row = document.createElement('tr');
+          row.id = `row-${index}`;
           row.className = isHighlighted ? 'highlighted' : '';
+          row.addEventListener('mouseenter', () => row.classList.add('hover-highlight'));
+          row.addEventListener('mouseleave', () => row.classList.remove('hover-highlight'));
           row.innerHTML = `
+            <td>${index + 1}</td>
             <td>
-              <img src="${item.imageUrl}" loading="lazy" alt="Image"
-                   onclick="openZoom('${item.imageUrl}')"
-                   onerror="this.src='https://via.placeholder.com/200?text=Image+Not+Found';">
-              <button onclick="copyToClipboard('${item.imageUrl}', 'URL đã được sao chép!')">Sao chép URL</button>
+              <img src="${item.imageUrl}" loading="lazy" alt="Image" onerror="this.src='https://via.placeholder.com/200?text=Image+Not+Found';">
+              <button class="copy-url-btn">Sao chép URL</button>
             </td>
             <td>
               <div class="prompt-text">${item.prompt}</div>
-              <button onclick='copyPromptAndHighlight(${JSON.stringify(item.prompt)}, this, ${JSON.stringify(item.imageUrl)})'>Sao chép Prompt</button>
+              <button class="copy-prompt-btn">Sao chép Prompt</button>
             </td>
             <td>
-              <button class="delete-btn" onclick="deletePrompt(${index})">Xoá</button>
+              <button class="delete-btn">Xoá</button>
             </td>`;
+
+          // Gắn sự kiện cho các nút
+          row.querySelector('img').addEventListener('click', () => openZoom(index));
+          row.querySelector('.copy-url-btn').addEventListener('click', () => copyToClipboard(item.imageUrl, 'URL đã được sao chép!'));
+          row.querySelector('.copy-prompt-btn').addEventListener('click', () => copyPromptAndHighlight(item.prompt, row, item.imageUrl));
+          row.querySelector('.delete-btn').addEventListener('click', () => deletePrompt(index));
+
           tableBody.appendChild(row);
         }
       });
+    }
+
+    function highlightActiveRow(index) {
+      document.querySelectorAll("tr").forEach(tr => tr.classList.remove("active-row"));
+      const row = document.getElementById(`row-${index}`);
+      if (row) {
+        row.classList.add("active-row");
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
 
     function processData() {
@@ -172,13 +239,43 @@
       navigator.clipboard.writeText(text).then(() => showToast(msg));
     }
 
-    function copyPromptAndHighlight(prompt, button, imageUrl) {
+    function copyPromptAndHighlight(prompt, row, imageUrl) {
       copyToClipboard(prompt, 'Prompt đã được sao chép!');
-      const row = button.closest('tr');
-      row.classList.add('highlighted');
-      if (!highlightedRows.includes(imageUrl)) {
-        highlightedRows.push(imageUrl);
-        saveToFirebase(processedData, highlightedRows);
+      if (!row.classList.contains('highlighted')) {
+        row.classList.add('highlighted');
+        if (!highlightedRows.includes(imageUrl)) {
+          highlightedRows.push(imageUrl);
+          saveToFirebase(processedData, highlightedRows);
+        }
+      }
+    }
+
+    function copyCurrentPrompt(e) {
+      e.stopPropagation();
+      if (processedData[currentIndex]) {
+        const prompt = processedData[currentIndex].prompt;
+        const imageUrl = processedData[currentIndex].imageUrl;
+        copyToClipboard(prompt, 'Prompt đã được sao chép!');
+
+        // Highlight hàng trong bảng
+        const row = document.getElementById(`row-${currentIndex}`);
+        if (row && !row.classList.contains('highlighted')) {
+          row.classList.add('highlighted');
+          if (!highlightedRows.includes(imageUrl)) {
+            highlightedRows.push(imageUrl);
+            saveToFirebase(processedData, highlightedRows);
+          }
+        }
+
+        // Cập nhật giao diện nút sao chép trong zoom
+        const btn = document.getElementById("copyPromptOverlayBtn");
+        btn.classList.add("copied");
+        btn.textContent = "✅ Prompt đã sao chép!";
+
+        setTimeout(() => {
+          btn.classList.remove("copied");
+          btn.textContent = "📋 Sao chép Prompt";
+        }, 1500);
       }
     }
 
@@ -190,17 +287,61 @@
       showToast("Đã xoá mục.");
     }
 
-    function openZoom(imageUrl) {
+    function openZoom(index) {
+      currentIndex = index;
       const overlay = document.getElementById('zoomOverlay');
       const zoomImg = overlay.querySelector('img');
-      zoomImg.src = imageUrl;
+      zoomImg.src = processedData[index].imageUrl;
       overlay.style.display = 'flex';
+      highlightActiveRow(index);
     }
 
     function closeZoom() {
       const overlay = document.getElementById('zoomOverlay');
       overlay.style.display = 'none';
       overlay.querySelector('img').src = '';
+      highlightActiveRow(currentIndex);
+    }
+
+    function nextImage(e) {
+      e.stopPropagation();
+      if (currentIndex < processedData.length - 1) {
+        openZoom(currentIndex + 1);
+      }
+    }
+
+    function prevImage(e) {
+      e.stopPropagation();
+      if (currentIndex > 0) {
+        openZoom(currentIndex - 1);
+      }
+    }
+
+    function deleteCurrentImageInZoom() {
+      if (currentIndex === -1 || processedData.length === 0) return; // Không có ảnh để xóa
+
+      // Xóa mục hiện tại
+      const removedItem = processedData.splice(currentIndex, 1)[0];
+      highlightedRows = highlightedRows.filter(url => url !== removedItem.imageUrl);
+
+      // Cập nhật Firebase và bảng
+      saveToFirebase(processedData, highlightedRows);
+      displayData(processedData, highlightedRows);
+
+      // Điều chỉnh currentIndex và hiển thị ảnh kế tiếp
+      if (processedData.length === 0) {
+        // Nếu không còn ảnh, đóng zoom
+        closeZoom();
+        currentIndex = -1;
+      } else {
+        // Nếu có ảnh kế tiếp, hiển thị ảnh đó
+        if (currentIndex >= processedData.length) {
+          currentIndex = processedData.length - 1; // Chuyển về ảnh cuối nếu xóa ảnh cuối
+        }
+        openZoom(currentIndex); // Hiển thị ảnh tại currentIndex
+      }
+
+      showToast("Đã xoá ảnh và prompt.");
     }
 
     function saveToFirebase(images, highlightedRows) {
@@ -215,6 +356,23 @@
         displayData(processedData, highlightedRows);
       });
     }
+
+    // Gắn sự kiện cho các nút ngoài bảng
+    document.getElementById('processDataBtn').addEventListener('click', processData);
+    document.getElementById('clearTableBtn').addEventListener('click', clearTable);
+    document.getElementById('zoomOverlay').addEventListener('click', closeZoom);
+    document.getElementById('copyPromptOverlayBtn').addEventListener('click', copyCurrentPrompt);
+    document.getElementById('prevImageBtn').addEventListener('click', prevImage);
+    document.getElementById('nextImageBtn').addEventListener('click', nextImage);
+
+    document.addEventListener('keydown', function(e) {
+      if (document.getElementById('zoomOverlay').style.display === 'flex') {
+        if (e.key === 'ArrowRight') nextImage(e);
+        else if (e.key === 'ArrowLeft') prevImage(e);
+        else if (e.key === 'Escape') closeZoom();
+        else if (e.key === 'Delete') deleteCurrentImageInZoom();
+      }
+    });
 
     window.addEventListener('load', () => {
       loadFromFirebaseRealtime();
