@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Process Image Prompts with Firebase</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea { width: 100%; height: 150px; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+    th { background-color: #f2f2f2; }
+    button { padding: 5px 10px; margin: 5px 5px 0 0; cursor: pointer; }
+    img { max-width: 200px; height: auto; display: block; }
+    .highlighted { background-color: #ffcccc; }
+    .delete-btn { background-color: #f44336; color: white; }
+    .prompt-text { max-height: none; overflow: visible; }
+    @media (max-width: 768px) {
+      .prompt-text {
+        max-height: 100px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 6;
+        -webkit-box-orient: vertical;
+      }
+    }
+    #toast {
+      visibility: hidden;
+      min-width: 200px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 8px;
+      padding: 10px;
+      position: fixed;
+      z-index: 1;
+      right: 20px;
+      bottom: 30px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.4s, visibility 0.4s;
+    }
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
+  </style>
+</head>
+<body>
+  <h1>Process Image Prompts with Firebase</h1>
+  <textarea id="inputData" placeholder="Dán JSON tại đây..."></textarea>
+  <button onclick="processData()">Nối dữ liệu mới</button>
+  <button onclick="clearTable()">Xoá bảng</button>
+  <button onclick="loadFromFirebase()">Tải từ Firebase</button>
+
+  <h2>Danh sách ảnh và prompt</h2>
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th>Ảnh</th>
+        <th>Prompt</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+  <div id="toast"></div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDQuVwM17oothw9REzdh3sTVEE-IS6R9cI",
+      authDomain: "ytpro-91601.firebaseapp.com",
+      databaseURL: "https://ytpro-91601-default-rtdb.firebaseio.com",
+      projectId: "ytpro-91601",
+      storageBucket: "ytpro-91601.appspot.com",
+      messagingSenderId: "897568362188",
+      appId: "1:897568362188:web:a3f9304fdd720831ecbc69",
+      measurementId: "G-KGM8X5NX79"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let processedData = [];
+    let highlightedRows = [];
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.className = "show";
+      setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2000);
+    }
+
+    function displayData(images, highlightedRows) {
+      const tableBody = document.getElementById('tableBody');
+      tableBody.innerHTML = '';
+      images.forEach((item, index) => {
+        if (item.imageUrl && item.prompt) {
+          const isHighlighted = highlightedRows.includes(item.imageUrl);
+          const row = document.createElement('tr');
+          row.className = isHighlighted ? 'highlighted' : '';
+          row.innerHTML = `
+            <td>
+              <img src="${item.imageUrl}" loading="lazy" alt="Image" onerror="this.src='https://via.placeholder.com/200?text=Image+Not+Found';">
+              <button onclick="copyToClipboard('${item.imageUrl}', 'URL đã được sao chép!')">Sao chép URL</button>
+            </td>
+            <td>
+              <div class="prompt-text">${item.prompt}</div>
+              <button onclick='copyPromptAndHighlight(${JSON.stringify(item.prompt)}, this, ${JSON.stringify(item.imageUrl)})'>Sao chép Prompt</button>
+            </td>
+            <td>
+              <button class="delete-btn" onclick="deletePrompt(${index})">Xoá</button>
+            </td>`;
+          tableBody.appendChild(row);
+        }
+      });
+    }
+
+    function processData() {
+      const input = document.getElementById('inputData').value.trim();
+      if (!input) return showToast("Vui lòng dán JSON!");
+      try {
+        const parsed = JSON.parse(input);
+        const newItems = Array.isArray(parsed) ? parsed : parsed.images || [];
+        processedData = processedData.concat(newItems);
+        saveToFirebase(processedData, highlightedRows);
+        displayData(processedData, highlightedRows);
+        showToast("Đã nối & lưu Firebase!");
+      } catch (e) {
+        showToast("JSON không hợp lệ!");
+      }
+    }
+
+    function clearTable() {
+      processedData = [];
+      highlightedRows = [];
+      displayData(processedData, highlightedRows);
+      saveToFirebase(processedData, highlightedRows);
+      showToast("Đã xoá bảng!");
+    }
+
+    function copyToClipboard(text, msg) {
+      navigator.clipboard.writeText(text).then(() => showToast(msg));
+    }
+
+    function copyPromptAndHighlight(prompt, button, imageUrl) {
+      copyToClipboard(prompt, 'Prompt đã được sao chép!');
+      const row = button.closest('tr');
+      row.classList.add('highlighted');
+      if (!highlightedRows.includes(imageUrl)) {
+        highlightedRows.push(imageUrl);
+        saveToFirebase(processedData, highlightedRows);
+      }
+    }
+
+    function deletePrompt(index) {
+      const removedItem = processedData.splice(index, 1)[0];
+      highlightedRows = highlightedRows.filter(url => url !== removedItem.imageUrl);
+      displayData(processedData, highlightedRows);
+      saveToFirebase(processedData, highlightedRows);
+      showToast("Đã xoá mục.");
+    }
+
+    function saveToFirebase(images, highlightedRows) {
+      db.ref("data").set({ images, highlightedRows });
+    }
+
+    function loadFromFirebase() {
+      db.ref("data").once("value")
+        .then(snapshot => {
+          const data = snapshot.val() || { images: [], highlightedRows: [] };
+          processedData = data.images || [];
+          highlightedRows = data.highlightedRows || [];
+          displayData(processedData, highlightedRows);
+          showToast("Đã tải từ Firebase!");
+        });
+    }
+
+    window.addEventListener('load', () => {
+      loadFromFirebase();
+    });
+  </script>
+</body>
+</html>
