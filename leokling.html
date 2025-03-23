@@ -53,7 +53,6 @@
   <textarea id="inputData" placeholder="Dán JSON tại đây..."></textarea>
   <button onclick="processData()">Nối dữ liệu mới</button>
   <button onclick="clearTable()">Xoá bảng</button>
-  <button onclick="loadFromFirebase()">Tải từ Firebase</button>
 
   <h2>Danh sách ảnh và prompt</h2>
   <table id="dataTable">
@@ -168,19 +167,17 @@
       db.ref("data").set({ images, highlightedRows });
     }
 
-    function loadFromFirebase() {
-      db.ref("data").once("value")
-        .then(snapshot => {
-          const data = snapshot.val() || { images: [], highlightedRows: [] };
-          processedData = data.images || [];
-          highlightedRows = data.highlightedRows || [];
-          displayData(processedData, highlightedRows);
-          showToast("Đã tải từ Firebase!");
-        });
+    function loadFromFirebaseRealtime() {
+      db.ref("data").on("value", (snapshot) => {
+        const data = snapshot.val() || { images: [], highlightedRows: [] };
+        processedData = data.images || [];
+        highlightedRows = data.highlightedRows || [];
+        displayData(processedData, highlightedRows);
+      });
     }
 
     window.addEventListener('load', () => {
-      loadFromFirebase();
+      loadFromFirebaseRealtime();
     });
   </script>
 </body>
