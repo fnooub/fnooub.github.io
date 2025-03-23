@@ -13,7 +13,7 @@
     th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
     th { background-color: #f2f2f2; }
     button { padding: 5px 10px; margin: 5px 5px 0 0; cursor: pointer; }
-    img { max-width: 200px; height: auto; display: block; }
+    img { max-width: 200px; height: auto; display: block; cursor: zoom-in; }
     .highlighted { background-color: #ffcccc; }
     .delete-btn { background-color: #f44336; color: white; }
     .prompt-text { max-height: none; overflow: visible; }
@@ -46,6 +46,24 @@
       visibility: visible;
       opacity: 1;
     }
+    #zoomOverlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.9);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+    }
+    #zoomOverlay img {
+      max-width: 100vw;
+      max-height: 100vh;
+      object-fit: contain;
+      cursor: zoom-out;
+    }
   </style>
 </head>
 <body>
@@ -67,6 +85,7 @@
   </table>
 
   <div id="toast"></div>
+  <div id="zoomOverlay" onclick="closeZoom()"><img src="" alt="Zoomed Image"></div>
 
   <script>
     const firebaseConfig = {
@@ -103,7 +122,9 @@
           row.className = isHighlighted ? 'highlighted' : '';
           row.innerHTML = `
             <td>
-              <img src="${item.imageUrl}" loading="lazy" alt="Image" onerror="this.src='https://via.placeholder.com/200?text=Image+Not+Found';">
+              <img src="${item.imageUrl}" loading="lazy" alt="Image"
+                   onclick="openZoom('${item.imageUrl}')"
+                   onerror="this.src='https://via.placeholder.com/200?text=Image+Not+Found';">
               <button onclick="copyToClipboard('${item.imageUrl}', 'URL đã được sao chép!')">Sao chép URL</button>
             </td>
             <td>
@@ -121,22 +142,15 @@
     function processData() {
       const input = document.getElementById('inputData').value.trim();
       if (!input) return showToast("Vui lòng dán JSON!");
-
       try {
         const parsed = JSON.parse(input);
         const newItems = Array.isArray(parsed) ? parsed : parsed.images || [];
-
-        // Bộ tập hợp các URL đã có
         const existingUrls = new Set(processedData.map(item => item.imageUrl));
-
-        // Lọc ra ảnh chưa tồn tại
         const uniqueNewItems = newItems.filter(item => !existingUrls.has(item.imageUrl));
-
         if (uniqueNewItems.length === 0) {
           showToast("Tất cả ảnh đã tồn tại!");
           return;
         }
-
         processedData = processedData.concat(uniqueNewItems);
         saveToFirebase(processedData, highlightedRows);
         displayData(processedData, highlightedRows);
@@ -174,6 +188,19 @@
       displayData(processedData, highlightedRows);
       saveToFirebase(processedData, highlightedRows);
       showToast("Đã xoá mục.");
+    }
+
+    function openZoom(imageUrl) {
+      const overlay = document.getElementById('zoomOverlay');
+      const zoomImg = overlay.querySelector('img');
+      zoomImg.src = imageUrl;
+      overlay.style.display = 'flex';
+    }
+
+    function closeZoom() {
+      const overlay = document.getElementById('zoomOverlay');
+      overlay.style.display = 'none';
+      overlay.querySelector('img').src = '';
     }
 
     function saveToFirebase(images, highlightedRows) {
