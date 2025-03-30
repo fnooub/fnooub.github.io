@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -111,6 +112,7 @@
   <textarea id="inputData" placeholder="Dán JSON tại đây..."></textarea>
   <button id="processDataBtn">Nối dữ liệu mới</button>
   <button id="clearTableBtn">Xoá bảng</button>
+  <button id="exportJsonBtn">📤 Xuất JSON</button>
 
   <h2>Danh sách ảnh và prompt</h2>
   <table id="dataTable">
@@ -146,7 +148,6 @@
       appId: "1:897568362188:web:a3f9304fdd720831ecbc69",
       measurementId: "G-KGM8X5NX79"
     };
-
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
@@ -209,15 +210,20 @@
     function processData() {
       const input = document.getElementById('inputData').value.trim();
       if (!input) return showToast("Vui lòng dán JSON!");
+
+      if (!confirm("Bạn có muốn nối dữ liệu mới vào danh sách hiện tại?")) return;
+
       try {
         const parsed = JSON.parse(input);
         const newItems = Array.isArray(parsed) ? parsed : parsed.images || [];
         const existingUrls = new Set(processedData.map(item => item.imageUrl));
         const uniqueNewItems = newItems.filter(item => !existingUrls.has(item.imageUrl));
+
         if (uniqueNewItems.length === 0) {
           showToast("Tất cả ảnh đã tồn tại!");
           return;
         }
+
         processedData = processedData.concat(uniqueNewItems);
         saveToFirebase(processedData, highlightedRows);
         displayData(processedData, highlightedRows);
@@ -227,7 +233,26 @@
       }
     }
 
+    function exportToJson() {
+      if (processedData.length === 0) {
+        showToast("Không có dữ liệu để xuất!");
+        return;
+      }
+      const jsonStr = JSON.stringify(processedData, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "prompts_export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Đã xuất JSON!");
+    }
+
     function clearTable() {
+      if (!confirm("Bạn có chắc chắn muốn xoá toàn bộ bảng và dữ liệu đã lưu?")) {
+        return;
+      }
       processedData = [];
       highlightedRows = [];
       displayData(processedData, highlightedRows);
@@ -364,6 +389,7 @@
     document.getElementById('copyPromptOverlayBtn').addEventListener('click', copyCurrentPrompt);
     document.getElementById('prevImageBtn').addEventListener('click', prevImage);
     document.getElementById('nextImageBtn').addEventListener('click', nextImage);
+    document.getElementById('exportJsonBtn').addEventListener('click', exportToJson);
 
     document.addEventListener('keydown', function(e) {
       if (document.getElementById('zoomOverlay').style.display === 'flex') {
