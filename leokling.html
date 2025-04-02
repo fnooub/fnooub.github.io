@@ -165,14 +165,41 @@
     function displayData(images, highlightedRows) {
       const tableBody = document.getElementById('tableBody');
       tableBody.innerHTML = '';
+
       images.forEach((item, index) => {
         if (item.imageUrl && item.prompt) {
           const isHighlighted = highlightedRows.includes(item.imageUrl);
           const row = document.createElement('tr');
           row.id = `row-${index}`;
           row.className = isHighlighted ? 'highlighted' : '';
-          row.addEventListener('mouseenter', () => row.classList.add('hover-highlight'));
-          row.addEventListener('mouseleave', () => row.classList.remove('hover-highlight'));
+          row.dataset.prompt = item.prompt; // Lưu prompt vào dataset để dễ so sánh
+
+          // Sự kiện hover: Highlight các hàng có cùng prompt
+          row.addEventListener('mouseenter', () => {
+            row.classList.add('hover-highlight'); // Highlight hàng hiện tại
+            // Tìm và highlight các hàng có cùng prompt
+            const rows = document.querySelectorAll('tr');
+            rows.forEach(otherRow => {
+              if (otherRow.dataset.prompt === item.prompt && otherRow.id !== row.id) {
+                otherRow.classList.add('hover-highlight');
+              }
+            });
+          });
+
+          // Sự kiện rời chuột: Xóa highlight động
+          row.addEventListener('mouseleave', () => {
+            row.classList.remove('hover-highlight'); // Xóa highlight hàng hiện tại
+            // Xóa highlight các hàng khác, nhưng giữ lại nếu chúng đã được highlight bởi highlightedRows
+            const rows = document.querySelectorAll('tr');
+            rows.forEach(otherRow => {
+              const otherIndex = parseInt(otherRow.id.replace('row-', ''));
+              const isOtherHighlighted = highlightedRows.includes(images[otherIndex]?.imageUrl);
+              if (otherRow.dataset.prompt === item.prompt && otherRow.id !== row.id && !isOtherHighlighted) {
+                otherRow.classList.remove('hover-highlight');
+              }
+            });
+          });
+
           row.innerHTML = `
             <td>${index + 1}</td>
             <td>
