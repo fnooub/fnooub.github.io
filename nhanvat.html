@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Input for Prompt Enhancer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+        }
+        .section {
+            margin-bottom: 20px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        h3 {
+            margin-top: 0;
+        }
+        .entry {
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+        }
+        .entry label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .entry input, .entry textarea {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 5px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .entry textarea {
+            height: 60px;
+            resize: vertical;
+        }
+        .entry .remove-btn {
+            background-color: #f44336;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .add-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        #defaultContextSection select {
+            width: 100%;
+            padding: 5px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        #exportBtn, #clearBtn {
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: block;
+            margin-top: 10px;
+        }
+        #clearBtn {
+            background-color: #f44336;
+        }
+        #exportBtn:hover {
+            background-color: #1976D2;
+        }
+        #clearBtn:hover {
+            background-color: #d32f2f;
+        }
+        .save-message {
+            color: #4CAF50;
+            margin-top: 10px;
+            display: none;
+        }
+        .clear-message {
+            color: #f44336;
+            margin-top: 10px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Data Input for Prompt Enhancer</h1>
+
+    <div class="section">
+        <h3>Characters</h3>
+        <button class="add-btn" onclick="addCharacter()">Add Character</button>
+        <div id="characterList"></div>
+    </div>
+
+    <div class="section">
+        <h3>Animals</h3>
+        <button class="add-btn" onclick="addAnimal()">Add Animal</button>
+        <div id="animalList"></div>
+    </div>
+
+    <div class="section">
+        <h3>Health States</h3>
+        <button class="add-btn" onclick="addHealthState()">Add Health State</button>
+        <div id="healthStateList"></div>
+    </div>
+
+    <div class="section">
+        <h3>Contexts</h3>
+        <button class="add-btn" onclick="addContext()">Add Context</button>
+        <div id="contextList"></div>
+    </div>
+
+    <div class="section" id="defaultContextSection">
+        <h3>Default Context</h3>
+        <select id="defaultContextSelect"></select>
+    </div>
+
+    <button id="exportBtn" onclick="exportJSON()">Export JSON</button>
+    <button id="clearBtn" onclick="clearAllData()">Clear All Data</button>
+    <div class="save-message" id="saveMessage">Dữ liệu đã được lưu!</div>
+    <div class="clear-message" id="clearMessage">Dữ liệu đã được xóa và reset!</div>
+
+    <script>
+        // Tải dữ liệu từ localStorage hoặc dùng mặc định
+        let data = JSON.parse(localStorage.getItem('promptData')) || {
+            characterPrompts: {
+                "jack": {
+                    "đường phố new york": "Jack là một người tóc đen, mặc áo sơ mi xanh, quần jeans",
+                    "sa mạc thảo nguyên châu phi": "Jack là một người tóc đen, mặc áo thun kaki, quần cargo",
+                    "default": "Jack là một người tóc đen, mặc áo sơ mi xanh, quần jeans"
+                },
+                "luna": {
+                    "đường phố new york": "Luna là một người tóc vàng, mặc áo hồng, cầm túi xách",
+                    "sa mạc thảo nguyên châu phi": "Luna là một người tóc vàng, mặc áo thun trắng, quần short",
+                    "default": "Luna là một người tóc vàng, mặc áo hồng"
+                }
+            },
+            animalPrompts: {
+                "báo tuyết": {
+                    "bị bệnh": "Báo tuyết lông xỉn, mắt mờ, vết ong đốt trên lưng",
+                    "khỏi bệnh": "Báo tuyết lông trắng sáng, mắt xanh, chạy nhảy linh hoạt"
+                },
+                "ngựa nâu": {
+                    "bị bệnh": "Ngựa nâu lông bết, thở yếu, sưng do ong đốt",
+                    "khỏi bệnh": "Ngựa nâu lông nâu bóng, phi nước đại mạnh mẽ"
+                },
+                "báo mẹ": {
+                    "bị bệnh": "Báo mẹ lông xỉn, mắt mờ, vết ong đốt trên lưng",
+                    "khỏi bệnh": "Báo mẹ lông trắng sáng, mắt xanh, chạy nhảy linh hoạt"
+                }
+            },
+            contextPrompts: {
+                "đường phố new york": {
+                    "description": "Bối cảnh đường phố New York",
+                    "keywords": ["đường phố", "mua sắm", "new york", "thành phố"]
+                },
+                "sa mạc thảo nguyên châu phi": {
+                    "description": "Bối cảnh sa mạc thảo nguyên châu Phi",
+                    "keywords": ["thảo nguyên", "châu phi", "safari", "sa mạc"]
+                }
+            },
+            healthStates: {
+                "bị bệnh": ["bị bệnh", "ốm", "yếu", "bị thương", "ong đốt"],
+                "khỏi bệnh": ["khỏi", "khỏe mạnh", "bình phục"]
+            },
+            defaultContext: "đường phố new york"
+        };
+
+        // Hàm tạo entry cho nhân vật
+        function createCharacterEntry(name, descriptions) {
+            const div = document.createElement('div');
+            div.className = 'entry';
+            div.innerHTML = `
+                <label>Name:</label>
+                <input type="text" class="char-name" value="${name || ''}">
+                <div class="context-desc-container"></div>
+                <button class="remove-btn" onclick="this.parentElement.remove(); saveData()">Remove</button>
+            `;
+            const container = div.querySelector('.context-desc-container');
+            const contexts = Object.keys(data.contextPrompts);
+            contexts.forEach(ctx => {
+                const desc = descriptions[ctx] || '';
+                const input = document.createElement('textarea');
+                input.placeholder = `${ctx} description`;
+                input.value = desc;
+                input.oninput = saveData;
+                container.appendChild(document.createElement('label')).textContent = `${ctx}:`;
+                container.appendChild(input);
+            });
+            const defaultDesc = descriptions['default'] || '';
+            const defaultInput = document.createElement('textarea');
+            defaultInput.placeholder = 'Default description';
+            defaultInput.value = defaultDesc;
+            defaultInput.oninput = saveData;
+            container.appendChild(document.createElement('label')).textContent = 'Default:';
+            container.appendChild(defaultInput);
+            return div;
+        }
+
+        // Hàm tạo entry cho con vật
+        function createAnimalEntry(name, descriptions) {
+            const div = document.createElement('div');
+            div.className = 'entry';
+            div.innerHTML = `
+                <label>Name:</label>
+                <input type="text" class="animal-name" value="${name || ''}">
+                <div class="health-state-desc-container"></div>
+                <button class="remove-btn" onclick="this.parentElement.remove(); saveData()">Remove</button>
+            `;
+            const container = div.querySelector('.health-state-desc-container');
+            Object.keys(data.healthStates).forEach(state => {
+                const desc = descriptions[state] || '';
+                const input = document.createElement('textarea');
+                input.placeholder = `${state} description`;
+                input.value = desc;
+                input.oninput = saveData;
+                container.appendChild(document.createElement('label')).textContent = `${state}:`;
+                container.appendChild(input);
+            });
+            return div;
+        }
+
+        // Hàm tạo entry cho trạng thái sức khỏe
+        function createHealthStateEntry(name, keywords) {
+            const div = document.createElement('div');
+            div.className = 'entry';
+            div.innerHTML = `
+                <label>Name:</label>
+                <input type="text" class="health-state-name" value="${name || ''}">
+                <label>Keywords (comma-separated):</label>
+                <input type="text" class="health-state-keywords" value="${keywords ? keywords.join(', ') : ''}">
+                <button class="remove-btn" onclick="this.parentElement.remove(); saveData()">Remove</button>
+            `;
+            div.querySelector('.health-state-name').oninput = saveData;
+            div.querySelector('.health-state-keywords').oninput = saveData;
+            return div;
+        }
+
+        // Hàm tạo entry cho bối cảnh
+        function createContextEntry(name, contextData) {
+            const div = document.createElement('div');
+            div.className = 'entry';
+            const keywords = contextData.keywords ? contextData.keywords.join(', ') : '';
+            div.innerHTML = `
+                <label>Name:</label>
+                <input type="text" class="context-name" value="${name || ''}">
+                <label>Description:</label>
+                <textarea class="context-desc">${contextData.description || ''}</textarea>
+                <label>Keywords (comma-separated):</label>
+                <input type="text" class="context-keywords" value="${keywords}">
+                <button class="remove-btn" onclick="this.parentElement.remove(); saveData()">Remove</button>
+            `;
+            div.querySelector('.context-name').oninput = saveData;
+            div.querySelector('.context-desc').oninput = saveData;
+            div.querySelector('.context-keywords').oninput = saveData;
+            return div;
+        }
+
+        // Khởi tạo danh sách
+        function initializeData() {
+            const charList = document.getElementById('characterList');
+            charList.innerHTML = '';
+            for (let [name, desc] of Object.entries(data.characterPrompts)) {
+                charList.appendChild(createCharacterEntry(name, desc));
+            }
+
+            const animalList = document.getElementById('animalList');
+            animalList.innerHTML = '';
+            for (let [name, desc] of Object.entries(data.animalPrompts)) {
+                animalList.appendChild(createAnimalEntry(name, desc));
+            }
+
+            const healthList = document.getElementById('healthStateList');
+            healthList.innerHTML = '';
+            for (let [name, keywords] of Object.entries(data.healthStates)) {
+                healthList.appendChild(createHealthStateEntry(name, keywords));
+            }
+
+            const contextList = document.getElementById('contextList');
+            contextList.innerHTML = '';
+            for (let [name, ctxData] of Object.entries(data.contextPrompts)) {
+                contextList.appendChild(createContextEntry(name, ctxData));
+            }
+
+            const defaultSelect = document.getElementById('defaultContextSelect');
+            defaultSelect.innerHTML = Object.keys(data.contextPrompts).map(ctx => `
+                <option value="${ctx}" ${ctx === data.defaultContext ? 'selected' : ''}>${ctx}</option>
+            `).join('');
+            defaultSelect.onchange = saveData;
+        }
+
+        // Thêm nhân vật
+        function addCharacter() {
+            document.getElementById('characterList').appendChild(createCharacterEntry('', {}));
+        }
+
+        // Thêm con vật
+        function addAnimal() {
+            document.getElementById('animalList').appendChild(createAnimalEntry('', {}));
+        }
+
+        // Thêm trạng thái sức khỏe
+        function addHealthState() {
+            document.getElementById('healthStateList').appendChild(createHealthStateEntry('', []));
+        }
+
+        // Thêm bối cảnh
+        function addContext() {
+            document.getElementById('contextList').appendChild(createContextEntry('', { description: '', keywords: [] }));
+        }
+
+        // Lưu dữ liệu vào localStorage
+        function saveData() {
+            const newCharacterPrompts = {};
+            document.querySelectorAll('#characterList .entry').forEach(entry => {
+                const name = entry.querySelector('.char-name').value.trim().toLowerCase();
+                if (name) {
+                    const descriptions = {};
+                    entry.querySelectorAll('.context-desc-container textarea').forEach((textarea, index) => {
+                        const label = entry.querySelectorAll('.context-desc-container label')[index].textContent.replace(':', '').toLowerCase();
+                        descriptions[label] = textarea.value.trim();
+                    });
+                    newCharacterPrompts[name] = descriptions;
+                }
+            });
+
+            const newAnimalPrompts = {};
+            document.querySelectorAll('#animalList .entry').forEach(entry => {
+                const name = entry.querySelector('.animal-name').value.trim().toLowerCase();
+                if (name) {
+                    const descriptions = {};
+                    entry.querySelectorAll('.health-state-desc-container textarea').forEach((textarea, index) => {
+                        const label = entry.querySelectorAll('.health-state-desc-container label')[index].textContent.replace(':', '').toLowerCase();
+                        descriptions[label] = textarea.value.trim();
+                    });
+                    newAnimalPrompts[name] = descriptions;
+                }
+            });
+
+            const newHealthStates = {};
+            document.querySelectorAll('#healthStateList .entry').forEach(entry => {
+                const name = entry.querySelector('.health-state-name').value.trim().toLowerCase();
+                if (name) {
+                    const keywords = entry.querySelector('.health-state-keywords').value.split(',').map(k => k.trim());
+                    newHealthStates[name] = keywords;
+                }
+            });
+
+            const newContextPrompts = {};
+            document.querySelectorAll('#contextList .entry').forEach(entry => {
+                const name = entry.querySelector('.context-name').value.trim().toLowerCase();
+                if (name) {
+                    const description = entry.querySelector('.context-desc').value.trim();
+                    const keywords = entry.querySelector('.context-keywords').value.split(',').map(k => k.trim());
+                    newContextPrompts[name] = { description, keywords };
+                }
+            });
+
+            const newDefaultContext = document.getElementById('defaultContextSelect').value.toLowerCase();
+
+            data = {
+                characterPrompts: newCharacterPrompts,
+                animalPrompts: newAnimalPrompts,
+                contextPrompts: newContextPrompts,
+                healthStates: newHealthStates,
+                defaultContext: newDefaultContext
+            };
+
+            localStorage.setItem('promptData', JSON.stringify(data));
+            const saveMessage = document.getElementById('saveMessage');
+            saveMessage.style.display = 'block';
+            setTimeout(() => saveMessage.style.display = 'none', 1000); // Ẩn thông báo sau 1 giây
+        }
+
+        // Xóa toàn bộ dữ liệu
+        function clearAllData() {
+            if (confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu và reset về mặc định?')) {
+                localStorage.removeItem('promptData');
+                data = {
+                    characterPrompts: {
+                        "jack": {
+                            "đường phố new york": "Jack là một người tóc đen, mặc áo sơ mi xanh, quần jeans",
+                            "sa mạc thảo nguyên châu phi": "Jack là một người tóc đen, mặc áo thun kaki, quần cargo",
+                            "default": "Jack là một người tóc đen, mặc áo sơ mi xanh, quần jeans"
+                        },
+                        "luna": {
+                            "đường phố new york": "Luna là một người tóc vàng, mặc áo hồng, cầm túi xách",
+                            "sa mạc thảo nguyên châu phi": "Luna là một người tóc vàng, mặc áo thun trắng, quần short",
+                            "default": "Luna là một người tóc vàng, mặc áo hồng"
+                        }
+                    },
+                    animalPrompts: {
+                        "báo tuyết": {
+                            "bị bệnh": "Báo tuyết lông xỉn, mắt mờ, vết ong đốt trên lưng",
+                            "khỏi bệnh": "Báo tuyết lông trắng sáng, mắt xanh, chạy nhảy linh hoạt"
+                        },
+                        "ngựa nâu": {
+                            "bị bệnh": "Ngựa nâu lông bết, thở yếu, sưng do ong đốt",
+                            "khỏi bệnh": "Ngựa nâu lông nâu bóng, phi nước đại mạnh mẽ"
+                        },
+                        "báo mẹ": {
+                            "bị bệnh": "Báo mẹ lông xỉn, mắt mờ, vết ong đốt trên lưng",
+                            "khỏi bệnh": "Báo mẹ lông trắng sáng, mắt xanh, chạy nhảy linh hoạt"
+                        }
+                    },
+                    contextPrompts: {
+                        "đường phố new york": {
+                            "description": "Bối cảnh đường phố New York",
+                            "keywords": ["đường phố", "mua sắm", "new york", "thành phố"]
+                        },
+                        "sa mạc thảo nguyên châu phi": {
+                            "description": "Bối cảnh sa mạc thảo nguyên châu Phi",
+                            "keywords": ["thảo nguyên", "châu phi", "safari", "sa mạc"]
+                        }
+                    },
+                    healthStates: {
+                        "bị bệnh": ["bị bệnh", "ốm", "yếu", "bị thương", "ong đốt"],
+                        "khỏi bệnh": ["khỏi", "khỏe mạnh", "bình phục"]
+                    },
+                    defaultContext: "đường phố new york"
+                };
+                initializeData();
+                const clearMessage = document.getElementById('clearMessage');
+                clearMessage.style.display = 'block';
+                setTimeout(() => clearMessage.style.display = 'none', 1000); // Ẩn thông báo sau 1 giây
+            }
+        }
+
+        // Xuất JSON
+        function exportJSON() {
+            saveData(); // Đảm bảo dữ liệu được cập nhật trước khi xuất
+            const jsonData = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'prompt_data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Khởi tạo khi tải trang
+        window.onload = initializeData;
+    </script>
+</body>
+</html>
