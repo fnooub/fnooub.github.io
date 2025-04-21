@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Process Image Prompts with Firebase</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    textarea { width: 100%; height: 150px; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; vertical-align: top; }
+    th { background-color: #f2f2f2; }
+    button { padding: 5px 10px; margin: 5px 5px 0 0; cursor: pointer; }
+    img { max-width: 200px; height: auto; display: block; cursor: zoom-in; }
+    .highlighted { background-color: #ffcccc; }
+    .hover-highlight { background-color: #ffffcc !important; }
+    .active-row { outline: 3px solid gold; }
+    .delete-btn { background-color: #f44336; color: white; }
+    .prompt-text { max-height: none; overflow: visible; }
+    @media (max-width: 768px) {
+      .prompt-text {
+        max-height: 100px;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 6;
+        -webkit-box-orient: vertical;
+      }
+    }
+    #toast {
+      visibility: hidden;
+      min-width: 200px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 8px;
+      padding: 10px;
+      position: fixed;
+      z-index: 1;
+      right: 20px;
+      bottom: 30px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.4s, visibility 0.4s;
+    }
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
+    #zoomOverlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: rgba(0, 0, 0, 0.9);
+      z-index: 9999;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+    }
+    #zoomOverlay img {
+      max-width: 100vw;
+      max-height: 70vh;
+      object-fit: contain;
+      cursor: zoom-out;
+    }
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      pointer-events: none;
+    }
+    .nav-button {
+      pointer-events: all;
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      border: none;
+      font-size: 2em;
+      padding: 10px 20px;
+      cursor: pointer;
+    }
+    #copyPromptOverlayBtn {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 0, 0.9);
+      color: black;
+      border: none;
+      font-size: 1.2em;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      z-index: 10000;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    #copyPromptOverlayBtn.copied {
+      background-color: #4CAF50 !important;
+      color: white;
+    }
+    #downloadImageBtn, #downloadImageWithPaddingBtn {
+      position: absolute;
+      background: rgba(0, 255, 0, 0.9);
+      color: black;
+      border: none;
+      font-size: 1.2em;
+      padding: 10px 20px;
+      border-radius: 10px;
+      cursor: pointer;
+      z-index: 10000;
+      transition: background-color 0.3s, color 0.3s;
+    }
+    #downloadImageBtn {
+      top: 70px;
+      left: 10%;
+      transform: translateX(-50%);
+    }
+    #downloadImageWithPaddingBtn {
+      top: 120px;
+      left: 10%;
+      transform: translateX(-50%);
+    }
+    #downloadImageBtn.downloaded, #downloadImageWithPaddingBtn.downloaded {
+      background-color: #4CAF50 !important;
+      color: white;
+    }
+    .camera-control-panel {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 10px;
+      border-radius: 8px;
+      max-height: 300px;
+      overflow-y: auto;
+      z-index: 10001;
+    }
+    .camera-control-panel h3 {
+      margin: 0 0 10px 0;
+      font-size: 1em;
+    }
+    .camera-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+    .camera-btn {
+        padding: 5px 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        cursor: pointer;
+        background-color: #333;
+        color: white;
+        font-size: 0.9em;
+    }
+    .camera-btn.selected {
+        background-color: #ff69b4;
+        border-color: #ff69b4;
+    }
+    .camera-btn:disabled {
+        background-color: #555;
+        cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>Process Image Prompts with Firebase</h1>
+  <textarea id="inputData" placeholder="Dán JSON tại đây..."></textarea>
+  <button id="processDataBtn">Nối dữ liệu mới</button>
+  <button id="clearTableBtn">Xoá bảng</button>
+  <button id="exportJsonBtn">📤 Xuất JSON</button>
+
+  <h2>Danh sách ảnh và prompt</h2>
+  <table id="dataTable">
+    <thead>
+      <tr>
+        <th>STT</th>
+        <th>Ảnh</th>
+        <th>Prompt</th>
+        <th>Hành động</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+
+  <div id="toast"></div>
+  <div id="zoomOverlay">
+    <button id="copyPromptOverlayBtn">📋 Sao chép Prompt</button>
+    <button id="downloadImageBtn">📥 Tải ảnh</button>
+    <button id="downloadImageWithPaddingBtn">📥 Tải ảnh với viền</button>
+    <div class="nav-buttons">
+      <button class="nav-button" id="prevImageBtn">←</button>
+      <button class="nav-button" id="nextImageBtn">→</button>
+    </div>
+    <img src="" alt="Zoomed Image">
+    <div class="camera-control-panel">
+      <h3>Camera Control</h3>
+      <div class="camera-controls"></div>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDQuVwM17oothw9REzdh3sTVEE-IS6R9cI",
+      authDomain: "ytpro-91601.firebaseapp.com",
+      databaseURL: "https://ytpro-91601-default-rtdb.firebaseio.com",
+      projectId: "ytpro-91601",
+      storageBucket: "ytpro-91601.appspot.com",
+      messagingSenderId: "897568362188",
+      appId: "1:897568362188:web:a3f9304fdd720831ecbc69",
+      measurementId: "G-KGM8X5NX79"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let processedData = [];
+    let highlightedRows = [];
+    let currentIndex = -1;
+
+    const cameraControls = [
+      "Truck left", "Truck right", "Pan left", "Pan right",
+      "Push in", "Pull out", "Pedestal up", "Pedestal down",
+      "Tilt up", "Tilt down", "Zoom in", "Zoom out",
+      "Shake", "Tracking shot", "Static shot"
+    ];
+
+    const exclusiveGroups = {
+      "Truck left": "Truck right",
+      "Truck right": "Truck left",
+      "Pan left": "Pan right",
+      "Pan right": "Pan left",
+      "Push in": "Pull out",
+      "Pull out": "Push in",
+      "Pedestal up": "Pedestal down",
+      "Pedestal down": "Pedestal up",
+      "Tilt up": "Tilt down",
+      "Tilt down": "Tilt up",
+      "Zoom in": "Zoom out",
+      "Zoom out": "Zoom in"
+    };
+
+    function showToast(message) {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.className = "show";
+      setTimeout(() => { toast.className = toast.className.replace("show", ""); }, 2000);
+    }
+
+    function initializeCameraControls(data) {
+      return data.map(item => ({
+        ...item,
+        cameraControls: item.cameraControls || []
+      }));
+    }
+
+    function displayData(images, highlightedRows) {
+      const tableBody = document.getElementById('tableBody');
+      tableBody.innerHTML = '';
+
+      images.forEach((item, index) => {
+        if (item.imageUrl && item.prompt) {
+          const isHighlighted = highlightedRows.includes(item.imageUrl);
+          const row = document.createElement('tr');
+          row.id = `row-${index}`;
+          row.className = isHighlighted ? 'highlighted' : '';
+          row.dataset.prompt = item.prompt;
+
+          row.addEventListener('mouseenter', () => {
+            row.classList.add('hover-highlight');
+            const rows = document.querySelectorAll('tr');
+            rows.forEach(otherRow => {
+              if (otherRow.dataset.prompt === item.prompt && otherRow.id !== row.id) {
+                otherRow.classList.add('hover-highlight');
+              }
+            });
+          });
+
+          row.addEventListener('mouseleave', () => {
+            row.classList.remove('hover-highlight');
+            const rows = document.querySelectorAll('tr');
+            rows.forEach(otherRow => {
+              const isOtherHighlighted = highlightedRows.includes(images[parseInt(otherRow.id.replace('row-', ''))]?.imageUrl);
+              if (otherRow.dataset.prompt === item.prompt && otherRow.id !== row.id && !isOtherHighlighted) {
+                otherRow.classList.remove('hover-highlight');
+              }
+            });
+          });
+
+          row.innerHTML = `
+            <td>${index + 1}</td>
+            <td>
+              <img src="${item.imageUrl}" loading="lazy" alt="Image" onerror="this.src='https://via.placeholder.com/200?text=Image+Not+Found';">
+              <button class="copy-url-btn">Sao chép URL</button>
+            </td>
+            <td>
+              <div class="prompt-text">${item.prompt}</div>
+              <button class="copy-prompt-btn">Sao chép Prompt</button>
+            </td>
+            <td>
+              <button class="delete-btn">Xoá</button>
+            </td>`;
+
+          row.querySelector('img').addEventListener('click', () => openZoom(index));
+          row.querySelector('.copy-url-btn').addEventListener('click', () => copyToClipboard(item.imageUrl, 'URL đã được sao chép!'));
+          row.querySelector('.copy-prompt-btn').addEventListener('click', () => copyPromptAndHighlight(item.prompt, row, item.imageUrl));
+          row.querySelector('.delete-btn').addEventListener('click', () => deletePrompt(index));
+
+          tableBody.appendChild(row);
+        }
+      });
+    }
+
+    function highlightActiveRow(index) {
+      document.querySelectorAll("tr").forEach(tr => tr.classList.remove("active-row"));
+      const row = document.getElementById(`row-${index}`);
+      if (row) {
+        row.classList.add("active-row");
+        row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    function processData() {
+      const input = document.getElementById('inputData').value.trim();
+      if (!input) return showToast("Vui lòng dán JSON!");
+
+      if (!confirm("Bạn có muốn nối dữ liệu mới vào danh sách hiện tại?")) return;
+
+      try {
+        const parsed = JSON.parse(input);
+        const newItems = Array.isArray(parsed) ? parsed : parsed.images || [];
+        const existingUrls = new Set(processedData.map(item => item.imageUrl));
+        const uniqueNewItems = newItems.filter(item => !existingUrls.has(item.imageUrl));
+
+        if (uniqueNewItems.length === 0) {
+          showToast("Tất cả ảnh đã tồn tại!");
+          return;
+        }
+
+        const initializedNewItems = initializeCameraControls(uniqueNewItems);
+        processedData = processedData.concat(initializedNewItems);
+        saveToFirebase(processedData, highlightedRows);
+        displayData(processedData, highlightedRows);
+        showToast(`Đã thêm ${uniqueNewItems.length} ảnh mới!`);
+      } catch (e) {
+        showToast("JSON không hợp lệ!");
+      }
+    }
+
+    function exportToJson() {
+      if (processedData.length === 0) {
+        showToast("Không có dữ liệu để xuất!");
+        return;
+      }
+      const jsonStr = JSON.stringify(processedData, null, 2);
+      const blob = new Blob([jsonStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "prompts_export.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Đã xuất JSON!");
+    }
+
+    function clearTable() {
+      if (!confirm("Bạn có chắc chắn muốn xoá toàn bộ bảng và dữ liệu đã lưu?")) {
+        return;
+      }
+      processedData = [];
+      highlightedRows = [];
+      displayData(processedData, highlightedRows);
+      saveToFirebase(processedData, highlightedRows);
+      showToast("Đã xoá bảng!");
+    }
+
+    function copyToClipboard(text, msg) {
+      navigator.clipboard.writeText(text).then(() => showToast(msg));
+    }
+
+    function copyPromptAndHighlight(prompt, row, imageUrl) {
+      copyToClipboard(prompt, 'Prompt đã được sao chép!');
+      if (!row.classList.contains('highlighted')) {
+        row.classList.add('highlighted');
+        if (!highlightedRows.includes(imageUrl)) {
+          highlightedRows.push(imageUrl);
+          saveToFirebase(processedData, highlightedRows);
+        }
+      }
+    }
+
+    function copyCurrentPrompt(e) {
+      e.stopPropagation();
+      if (processedData[currentIndex]) {
+        const prompt = processedData[currentIndex].prompt;
+        const imageUrl = processedData[currentIndex].imageUrl;
+        copyToClipboard(prompt, 'Prompt đã được sao chép!');
+
+        const row = document.getElementById(`row-${currentIndex}`);
+        if (row && !row.classList.contains('highlighted')) {
+          row.classList.add('highlighted');
+          if (!highlightedRows.includes(imageUrl)) {
+            highlightedRows.push(imageUrl);
+            saveToFirebase(processedData, highlightedRows);
+          }
+        }
+
+        const btn = document.getElementById("copyPromptOverlayBtn");
+        btn.classList.add("copied");
+        btn.textContent = "✅ Prompt đã sao chép!";
+
+        setTimeout(() => {
+          btn.classList.remove("copied");
+          btn.textContent = "📋 Sao chép Prompt";
+        }, 1500);
+      }
+    }
+
+    function downloadImage(e) {
+      e.stopPropagation();
+      if (processedData[currentIndex]) {
+        const imageUrl = processedData[currentIndex].imageUrl;
+        
+        fetch(imageUrl, { mode: 'cors' })
+            .then(response => {
+                if (!response.ok) throw new Error('Không thể tải ảnh');
+                return response.blob();
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `image_${currentIndex + 1}`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                window.URL.revokeObjectURL(url);
+
+                const btn = document.getElementById("downloadImageBtn");
+                btn.classList.add("downloaded");
+                btn.textContent = "✅ Đã tải ảnh!";
+
+                setTimeout(() => {
+                    btn.classList.remove("downloaded");
+                    btn.textContent = "📥 Tải ảnh";
+                }, 1500);
+
+                showToast("Đã tải ảnh!");
+            })
+            .catch(error => {
+                console.error('Lỗi khi tải ảnh:', error);
+                showToast("Không thể tải ảnh do lỗi CORS hoặc server!");
+            });
+      }
+    }
+
+    function downloadImageWithPadding(e) {
+      e.stopPropagation();
+      if (processedData[currentIndex]) {
+        const imageUrl = processedData[currentIndex].imageUrl;
+        
+        fetch(imageUrl, { mode: 'cors' })
+            .then(response => {
+                if (!response.ok) throw new Error('Không thể tải ảnh');
+                return response.blob();
+            })
+            .then(blob => {
+                const img = new Image();
+                img.crossOrigin = "Anonymous"; // Đảm bảo canvas không bị tainted
+                img.onload = function () {
+                    const originalWidth = img.width;
+                    const originalHeight = img.height;
+                    const padding = Math.floor(originalHeight * 0.09);
+                    const canvas = document.createElement('canvas');
+                    canvas.width = originalWidth;
+                    canvas.height = originalHeight + padding;
+                    const ctx = canvas.getContext('2d');
+
+                    ctx.drawImage(img, 0, 0);
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(0, originalHeight, originalWidth, padding);
+
+                    canvas.toBlob(function(blob) {
+                        const url = window.URL.createObjectURL(blob);
+                        const link = document.createElement("a");
+                        link.href = url;
+                        link.download = `padded_image_${currentIndex + 1}.jpg`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(url);
+
+                        const btn = document.getElementById("downloadImageWithPaddingBtn");
+                        btn.classList.add("downloaded");
+                        btn.textContent = "✅ Đã tải ảnh với viền!";
+
+                        setTimeout(() => {
+                            btn.classList.remove("downloaded");
+                            btn.textContent = "📥 Tải ảnh với viền";
+                        }, 1500);
+
+                        showToast("Đã tải ảnh với viền!");
+                    }, 'image/jpeg', 1.0);
+                };
+                img.onerror = () => {
+                    showToast("Không thể tải ảnh do lỗi CORS hoặc server!");
+                };
+                img.src = URL.createObjectURL(blob);
+            })
+            .catch(error => {
+                console.error('Lỗi khi tải ảnh:', error);
+                showToast("Không thể tải ảnh do lỗi CORS hoặc server!");
+            });
+      }
+    }
+
+    function deletePrompt(index) {
+      const removedItem = processedData.splice(index, 1)[0];
+      highlightedRows = highlightedRows.filter(url => url !== removedItem.imageUrl);
+      displayData(processedData, highlightedRows);
+      saveToFirebase(processedData, highlightedRows);
+      showToast("Đã xoá mục.");
+    }
+
+    function openZoom(index) {
+      currentIndex = index;
+      const overlay = document.getElementById('zoomOverlay');
+      const zoomImg = overlay.querySelector('img');
+      zoomImg.src = processedData[index].imageUrl;
+      overlay.style.display = 'flex';
+      highlightActiveRow(index);
+      updateCameraControlsUI();
+    }
+
+    function updateCameraControlsUI() {
+      const cameraControlsDiv = document.querySelector('.camera-controls');
+      cameraControlsDiv.innerHTML = '';
+
+      const item = processedData[currentIndex];
+      const currentControls = item.cameraControls || [];
+
+      const isStaticShotSelected = currentControls.includes("Static shot");
+      const otherControlsSelected = currentControls.length > 0 && !isStaticShotSelected;
+
+      cameraControls.forEach(control => {
+        const btn = document.createElement('button');
+        btn.className = 'camera-btn';
+        btn.textContent = control;
+        btn.dataset.control = control;
+
+        const isSelected = currentControls.includes(control);
+        btn.classList.toggle('selected', isSelected);
+
+        if (
+          (currentControls.length >= 3 && !isSelected) ||
+          (isStaticShotSelected && control !== "Static shot") ||
+          (otherControlsSelected && control === "Static shot")
+        ) {
+          btn.disabled = true;
+        }
+
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleCameraControl(control);
+        });
+        cameraControlsDiv.appendChild(btn);
+      });
+    }
+
+    function toggleCameraControl(control) {
+      const item = processedData[currentIndex];
+      let currentControls = item.cameraControls || [];
+
+      const controlIndex = currentControls.indexOf(control);
+
+      if (controlIndex === -1) {
+        if (currentControls.length >= 3) {
+          showToast("Bạn chỉ có thể chọn tối đa 3 thuộc tính!");
+          return;
+        }
+
+        if (exclusiveGroups[control] && currentControls.includes(exclusiveGroups[control])) {
+          currentControls = currentControls.filter(c => c !== exclusiveGroups[control]);
+        }
+
+        currentControls.push(control);
+      } else {
+        currentControls.splice(controlIndex, 1);
+      }
+
+      item.cameraControls = currentControls;
+
+      const basePrompt = item.prompt.split(' [')[0];
+      item.prompt = item.cameraControls.length > 0 
+        ? `${basePrompt} [${item.cameraControls.join(', ')}]`
+        : basePrompt;
+
+      displayData(processedData, highlightedRows);
+      saveToFirebase(processedData, highlightedRows);
+      updateCameraControlsUI();
+      showToast("Đã cập nhật camera controls!");
+    }
+
+    function closeZoom() {
+      const overlay = document.getElementById('zoomOverlay');
+      overlay.style.display = 'none';
+      overlay.querySelector('img').src = '';
+      highlightActiveRow(currentIndex);
+    }
+
+    function nextImage(e) {
+      e.stopPropagation();
+      if (currentIndex < processedData.length - 1) {
+        openZoom(currentIndex + 1);
+      }
+    }
+
+    function prevImage(e) {
+      e.stopPropagation();
+      if (currentIndex > 0) {
+        openZoom(currentIndex - 1);
+      }
+    }
+
+    function deleteCurrentImageInZoom() {
+      if (currentIndex === -1 || processedData.length === 0) return;
+
+      const removedItem = processedData.splice(currentIndex, 1)[0];
+      highlightedRows = highlightedRows.filter(url => url !== removedItem.imageUrl);
+
+      saveToFirebase(processedData, highlightedRows);
+      displayData(processedData, highlightedRows);
+
+      if (processedData.length === 0) {
+        closeZoom();
+        currentIndex = -1;
+      } else {
+        if (currentIndex >= processedData.length) {
+          currentIndex = processedData.length - 1;
+        }
+        openZoom(currentIndex);
+      }
+
+      showToast("Đã xoá ảnh và prompt.");
+    }
+
+    function saveToFirebase(images, highlightedRows) {
+      db.ref("data").set({ images, highlightedRows });
+    }
+
+    function loadFromFirebaseRealtime() {
+      db.ref("data").on("value", (snapshot) => {
+        const data = snapshot.val() || { images: [], highlightedRows: [] };
+        processedData = initializeCameraControls(data.images || []);
+        highlightedRows = data.highlightedRows || [];
+        displayData(processedData, highlightedRows);
+      });
+    }
+
+    document.getElementById('processDataBtn').addEventListener('click', processData);
+    document.getElementById('clearTableBtn').addEventListener('click', clearTable);
+    document.getElementById('zoomOverlay').addEventListener('click', closeZoom);
+    document.getElementById('copyPromptOverlayBtn').addEventListener('click', copyCurrentPrompt);
+    document.getElementById('downloadImageBtn').addEventListener('click', downloadImage);
+    document.getElementById('downloadImageWithPaddingBtn').addEventListener('click', downloadImageWithPadding);
+    document.getElementById('prevImageBtn').addEventListener('click', prevImage);
+    document.getElementById('nextImageBtn').addEventListener('click', nextImage);
+    document.getElementById('exportJsonBtn').addEventListener('click', exportToJson);
+
+    document.addEventListener('keydown', function(e) {
+      if (document.getElementById('zoomOverlay').style.display === 'flex') {
+        if (e.key === 'ArrowRight') nextImage(e);
+        else if (e.key === 'ArrowLeft') prevImage(e);
+        else if (e.key === 'Escape') closeZoom();
+        else if (e.key === 'Delete') deleteCurrentImageInZoom();
+      }
+    });
+
+    window.addEventListener('load', () => {
+      loadFromFirebaseRealtime();
+    });
+  </script>
+</body>
+</html>
