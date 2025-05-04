@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gmail Dot Variations Generator</title>
+    <title>Trình Tạo Biến Thể Dấu Chấm Gmail</title>
+    <link rel="icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/6/65/Pokémon_logo_2016.svg/1200px-Pokémon_logo_2016.svg.png" type="image/png">
     <style>
         /* Global Styles */
         body {
@@ -164,14 +165,23 @@
 
     <div class="container">
         <h1>Hoang Nam</h1>
-        <input type="text" id="email" placeholder="Nhập gmail">
-        <button onclick="generateVariations()">Nhân bản gmail</button>
+        <input type="text" id="email" placeholder="Nhập địa chỉ Gmail của bạn">
+        <button onclick="generateVariations()">Tạo Biến Thể</button>
         <div id="alert" class="alert"></div>
         <div class="count" id="count"></div>
         <div class="results" id="results"></div>
     </div>
 
     <script>
+        // Load saved email and generate variations on page load
+        window.onload = function() {
+            const savedEmail = localStorage.getItem('savedEmail');
+            if (savedEmail) {
+                document.getElementById('email').value = savedEmail;
+                generateVariations();
+            }
+        };
+
         function generateVariations() {
             const email = document.getElementById('email').value.trim();
             const alertBox = document.getElementById('alert');
@@ -182,21 +192,31 @@
             countDiv.innerHTML = ''; // Reset count
 
             if (!email || !email.includes('@gmail.com')) {
-                alertBox.innerHTML = 'Nhập gmail';
+                alertBox.innerHTML = 'Vui lòng nhập địa chỉ Gmail hợp lệ!';
+                localStorage.removeItem('savedEmail');
                 return;
             }
+
+            // Save email to localStorage
+            localStorage.setItem('savedEmail', email);
 
             const localPart = email.split('@')[0];
             const domainPart = email.split('@')[1];
 
+            // Get saved copied emails from localStorage
+            const savedCopiedEmails = JSON.parse(localStorage.getItem('copiedEmails') || '[]');
+
             let variations = getDotVariations(localPart).map(varEmail => varEmail + '@' + domainPart);
-            resultsDiv.innerHTML = variations.map((variation, index) => `
-                <div class="result-item" id="result-${index}" onclick="copyEmail('${variation}', ${index})">
-                    <span class="stt">${index + 1}.</span>
-                    <span class="email">${variation}</span>
-                </div>
-            `).join('');
-            countDiv.innerHTML = 'Tổng số: ' + variations.length;
+            resultsDiv.innerHTML = variations.map((variation, index) => {
+                const isCopied = savedCopiedEmails.includes(variation) ? ' copied' : '';
+                return `
+                    <div class="result-item${isCopied}" id="result-${index}" onclick="copyEmail('${variation}', ${index})">
+                        <span class="stt">${index + 1}.</span>
+                        <span class="email">${variation}</span>
+                    </div>
+                `;
+            }).join('');
+            countDiv.innerHTML = 'Tổng số biến thể: ' + variations.length;
         }
 
         function getDotVariations(str) {
@@ -217,9 +237,16 @@
             navigator.clipboard.writeText(email).then(() => {
                 const resultItem = document.getElementById(`result-${index}`);
                 resultItem.classList.add('copied');
+
+                // Save copied email to localStorage
+                let copiedEmails = JSON.parse(localStorage.getItem('copiedEmails') || '[]');
+                if (!copiedEmails.includes(email)) {
+                    copiedEmails.push(email);
+                    localStorage.setItem('copiedEmails', JSON.stringify(copiedEmails));
+                }
             }).catch(err => {
                 console.error('Failed to copy: ', err);
-                document.getElementById('alert').innerHTML = 'sao chép sai!';
+                document.getElementById('alert').innerHTML = 'Không thể sao chép email!';
             });
         }
     </script>
