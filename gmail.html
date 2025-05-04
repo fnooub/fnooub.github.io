@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gmail Dot Variations Generator</title>
+    <style>
+        /* Global Styles */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            max-width: 500px;
+            width: 100%;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+            color: #333;
+        }
+
+        input, button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            box-sizing: border-box;
+        }
+
+        input:focus, button:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            color: #333;
+        }
+
+        .result-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 3px;
+        }
+
+        .result-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .result-item span.stt {
+            width: 30px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        .result-item span.email {
+            flex-grow: 1;
+            word-break: break-all;
+        }
+
+        .copied {
+            background-color: #ffe6f0;
+        }
+
+        .count {
+            margin-top: 15px;
+            font-size: 16px;
+            font-weight: bold;
+            text-align: center;
+            color: #333;
+        }
+
+        .alert {
+            color: #d32f2f;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        /* Footer Styling */
+        .credit {
+            margin-top: 20px;
+            font-size: 12px;
+            text-align: center;
+            color: #666;
+        }
+
+        .credit a {
+            color: #007bff;
+            text-decoration: none;
+        }
+
+        .credit a:hover {
+            text-decoration: underline;
+        }
+
+        /* Media Queries for Responsiveness */
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            input, button {
+                font-size: 14px;
+            }
+
+            .results {
+                padding: 10px;
+            }
+
+            .result-item {
+                font-size: 12px;
+            }
+
+            .result-item span.stt {
+                width: 25px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <input type="text" id="email" placeholder="Nhập gmail">
+        <button onclick="generateVariations()">Nhân bản gmail</button>
+        <div id="alert" class="alert"></div>
+        <div class="count" id="count"></div>
+        <div class="results" id="results"></div>
+    </div>
+
+    <script>
+        function generateVariations() {
+            const email = document.getElementById('email').value.trim();
+            const alertBox = document.getElementById('alert');
+            const resultsDiv = document.getElementById('results');
+            const countDiv = document.getElementById('count');
+            alertBox.innerHTML = ''; // Reset alert message
+            resultsDiv.innerHTML = ''; // Reset results
+            countDiv.innerHTML = ''; // Reset count
+
+            if (!email || !email.includes('@gmail.com')) {
+                alertBox.innerHTML = 'Nhập gmail';
+                return;
+            }
+
+            const localPart = email.split('@')[0];
+            const domainPart = email.split('@')[1];
+
+            let variations = getDotVariations(localPart).map(varEmail => varEmail + '@' + domainPart);
+            resultsDiv.innerHTML = variations.map((variation, index) => `
+                <div class="result-item" id="result-${index}" onclick="copyEmail('${variation}', ${index})">
+                    <span class="stt">${index + 1}.</span>
+                    <span class="email">${variation}</span>
+                </div>
+            `).join('');
+            countDiv.innerHTML = 'Tổng số: ' + variations.length;
+        }
+
+        function getDotVariations(str) {
+            let results = [];
+            const recurse = (startIndex, currentStr) => {
+                if (startIndex === str.length) {
+                    results.push(currentStr);
+                    return;
+                }
+                recurse(startIndex + 1, currentStr + str[startIndex]);
+                recurse(startIndex + 1, currentStr + '.' + str[startIndex]);
+            };
+            recurse(1, str[0]);
+            return results;
+        }
+
+        function copyEmail(email, index) {
+            navigator.clipboard.writeText(email).then(() => {
+                const resultItem = document.getElementById(`result-${index}`);
+                resultItem.classList.add('copied');
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                document.getElementById('alert').innerHTML = 'sao chép sai!';
+            });
+        }
+    </script>
+
+</body>
+</html>
