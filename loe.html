@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -460,6 +461,15 @@
       }
     }
 
+    function generateRandomString(length) {
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return result;
+    }
+
     function downloadImageWithPadding(e) {
       e.stopPropagation();
       if (processedData[currentIndex]) {
@@ -476,7 +486,7 @@
                 img.onload = function () {
                     const originalWidth = img.width;
                     const originalHeight = img.height;
-                    const padding = Math.floor(originalHeight * 0.09);
+                    const padding = Math.floor(originalHeight * 0.083);
                     const canvas = document.createElement('canvas');
                     canvas.width = originalWidth;
                     canvas.height = originalHeight + padding;
@@ -490,7 +500,7 @@
                         const url = window.URL.createObjectURL(blob);
                         const link = document.createElement("a");
                         link.href = url;
-                        link.download = `padded_image_${currentIndex + 1}.jpg`;
+                        link.download = `${generateRandomString(6)}_${currentIndex + 1}.jpg`;
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
