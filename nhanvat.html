@@ -140,47 +140,11 @@
     <script>
         // Tải dữ liệu từ localStorage hoặc dùng mặc định
         let data = JSON.parse(localStorage.getItem('promptData')) || {
-            characterPrompts: {
-                "jack": {
-                    "đường phố new york": "Jack là một người tóc đen, mặc áo sơ mi xanh, quần jeans",
-                    "sa mạc thảo nguyên châu phi": "Jack là một người tóc đen, mặc áo thun kaki, quần cargo",
-                    "default": "Jack là một người tóc đen, mặc áo sơ mi xanh, quần jeans"
-                },
-                "luna": {
-                    "đường phố new york": "Luna là một người tóc vàng, mặc áo hồng, cầm túi xách",
-                    "sa mạc thảo nguyên châu phi": "Luna là một người tóc vàng, mặc áo thun trắng, quần short",
-                    "default": "Luna là một người tóc vàng, mặc áo hồng"
-                }
-            },
-            animalPrompts: {
-                "báo tuyết": {
-                    "bị bệnh": "Báo tuyết lông xỉn, mắt mờ, vết ong đốt trên lưng",
-                    "khỏi bệnh": "Báo tuyết lông trắng sáng, mắt xanh, chạy nhảy linh hoạt"
-                },
-                "ngựa nâu": {
-                    "bị bệnh": "Ngựa nâu lông bết, thở yếu, sưng do ong đốt",
-                    "khỏi bệnh": "Ngựa nâu lông nâu bóng, phi nước đại mạnh mẽ"
-                },
-                "báo mẹ": {
-                    "bị bệnh": "Báo mẹ lông xỉn, mắt mờ, vết ong đốt trên lưng",
-                    "khỏi bệnh": "Báo mẹ lông trắng sáng, mắt xanh, chạy nhảy linh hoạt"
-                }
-            },
-            contextPrompts: {
-                "đường phố new york": {
-                    "description": "Bối cảnh đường phố New York",
-                    "keywords": ["đường phố", "mua sắm", "new york", "thành phố"]
-                },
-                "sa mạc thảo nguyên châu phi": {
-                    "description": "Bối cảnh sa mạc thảo nguyên châu Phi",
-                    "keywords": ["thảo nguyên", "châu phi", "safari", "sa mạc"]
-                }
-            },
-            healthStates: {
-                "bị bệnh": ["bị bệnh", "ốm", "yếu", "bị thương", "ong đốt"],
-                "khỏi bệnh": ["khỏi", "khỏe mạnh", "bình phục"]
-            },
-            defaultContext: "đường phố new york"
+            characterPrompts: {},
+            animalPrompts: {},
+            contextPrompts: {},
+            healthStates: {},
+            defaultContext: ""
         };
 
         // Hàm tạo entry cho nhân vật
@@ -300,9 +264,11 @@
             }
 
             const defaultSelect = document.getElementById('defaultContextSelect');
-            defaultSelect.innerHTML = Object.keys(data.contextPrompts).map(ctx => `
-                <option value="${ctx}" ${ctx === data.defaultContext ? 'selected' : ''}>${ctx}</option>
-            `).join('');
+            defaultSelect.innerHTML = Object.keys(data.contextPrompts).length > 0 
+                ? Object.keys(data.contextPrompts).map(ctx => `
+                    <option value="${ctx}" ${ctx === data.defaultContext ? 'selected' : ''}>${ctx}</option>
+                  `).join('')
+                : '<option value="">Không có bối cảnh</option>';
             defaultSelect.onchange = saveData;
         }
 
@@ -373,7 +339,9 @@
                 }
             });
 
-            const newDefaultContext = document.getElementById('defaultContextSelect').value.toLowerCase();
+            const newDefaultContext = Object.keys(newContextPrompts).length > 0 
+                ? document.getElementById('defaultContextSelect').value.toLowerCase() 
+                : "";
 
             data = {
                 characterPrompts: newCharacterPrompts,
@@ -386,66 +354,30 @@
             localStorage.setItem('promptData', JSON.stringify(data));
             const saveMessage = document.getElementById('saveMessage');
             saveMessage.style.display = 'block';
-            setTimeout(() => saveMessage.style.display = 'none', 1000); // Ẩn thông báo sau 1 giây
+            setTimeout(() => saveMessage.style.display = 'none', 1000);
         }
 
         // Xóa toàn bộ dữ liệu
         function clearAllData() {
-            if (confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu và reset về mặc định?')) {
-                localStorage.removeItem('promptData');
+            if (confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu và reset về trạng thái rỗng?')) {
                 data = {
-                    characterPrompts: {
-                        "jack": {
-                            "đường phố new york": "Jack là một người tóc đen, mặc áo sơ mi xanh, quần jeans",
-                            "sa mạc thảo nguyên châu phi": "Jack là một người tóc đen, mặc áo thun kaki, quần cargo",
-                            "default": "Jack là một người tóc đen, mặc áo sơ mi xanh, quần jeans"
-                        },
-                        "luna": {
-                            "đường phố new york": "Luna là một người tóc vàng, mặc áo hồng, cầm túi xách",
-                            "sa mạc thảo nguyên châu phi": "Luna là một người tóc vàng, mặc áo thun trắng, quần short",
-                            "default": "Luna là một người tóc vàng, mặc áo hồng"
-                        }
-                    },
-                    animalPrompts: {
-                        "báo tuyết": {
-                            "bị bệnh": "Báo tuyết lông xỉn, mắt mờ, vết ong đốt trên lưng",
-                            "khỏi bệnh": "Báo tuyết lông trắng sáng, mắt xanh, chạy nhảy linh hoạt"
-                        },
-                        "ngựa nâu": {
-                            "bị bệnh": "Ngựa nâu lông bết, thở yếu, sưng do ong đốt",
-                            "khỏi bệnh": "Ngựa nâu lông nâu bóng, phi nước đại mạnh mẽ"
-                        },
-                        "báo mẹ": {
-                            "bị bệnh": "Báo mẹ lông xỉn, mắt mờ, vết ong đốt trên lưng",
-                            "khỏi bệnh": "Báo mẹ lông trắng sáng, mắt xanh, chạy nhảy linh hoạt"
-                        }
-                    },
-                    contextPrompts: {
-                        "đường phố new york": {
-                            "description": "Bối cảnh đường phố New York",
-                            "keywords": ["đường phố", "mua sắm", "new york", "thành phố"]
-                        },
-                        "sa mạc thảo nguyên châu phi": {
-                            "description": "Bối cảnh sa mạc thảo nguyên châu Phi",
-                            "keywords": ["thảo nguyên", "châu phi", "safari", "sa mạc"]
-                        }
-                    },
-                    healthStates: {
-                        "bị bệnh": ["bị bệnh", "ốm", "yếu", "bị thương", "ong đốt"],
-                        "khỏi bệnh": ["khỏi", "khỏe mạnh", "bình phục"]
-                    },
-                    defaultContext: "đường phố new york"
+                    characterPrompts: {},
+                    animalPrompts: {},
+                    contextPrompts: {},
+                    healthStates: {},
+                    defaultContext: ""
                 };
+                localStorage.removeItem('promptData');
                 initializeData();
                 const clearMessage = document.getElementById('clearMessage');
                 clearMessage.style.display = 'block';
-                setTimeout(() => clearMessage.style.display = 'none', 1000); // Ẩn thông báo sau 1 giây
+                setTimeout(() => clearMessage.style.display = 'none', 1000);
             }
         }
 
         // Xuất JSON
         function exportJSON() {
-            saveData(); // Đảm bảo dữ liệu được cập nhật trước khi xuất
+            saveData();
             const jsonData = JSON.stringify(data, null, 2);
             const blob = new Blob([jsonData], { type: 'application/json' });
             const url = URL.createObjectURL(blob);

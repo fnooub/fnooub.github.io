@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Add Bottom Padding (7.29%) - High Quality JPEG</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      background: #f4f4f4;
+      padding: 2rem;
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    input, .drop-zone {
+      margin-top: 1rem;
+    }
+    canvas {
+      margin-top: 1rem;
+      max-width: 90%;
+      border: 1px solid #ccc;
+    }
+    .drop-zone {
+      border: 2px dashed #ccc;
+      padding: 2rem;
+      background: #fff;
+      cursor: pointer;
+    }
+    .drop-zone.dragover {
+      background: #e1e1e1;
+      border-color: #000;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Add Bottom Black Padding (7.29%)</h1>
+  <div id="dropZone" class="drop-zone">Drag and drop an image here or click to select</div>
+  <input type="file" id="upload" accept="image/*" style="display: none;" />
+  <br>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const uploadInput = document.getElementById('upload');
+    const canvas = document.getElementById('canvas');
+    let currentIndex = 0; // Theo dõi số thứ tự file
+
+    // Hàm tạo chuỗi ngẫu nhiên
+    function generateRandomString(length) {
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return result;
+    }
+
+    // Hàm xử lý file ảnh
+    function processImage(file) {
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        const img = new Image();
+        img.onload = function () {
+          const originalWidth = img.width;
+          const originalHeight = img.height;
+
+          // Thêm 9% chiều cao làm viền đen (sửa thành 0.0729 nếu muốn đúng 7.29%)
+          const padding = Math.floor(originalHeight * 0.083);
+          canvas.width = originalWidth;
+          canvas.height = originalHeight + padding;
+
+          const ctx = canvas.getContext('2d');
+
+          // Vẽ ảnh gốc
+          ctx.drawImage(img, 0, 0);
+
+          // Vẽ viền đen bên dưới
+          ctx.fillStyle = 'black';
+          ctx.fillRect(0, originalHeight, originalWidth, padding);
+
+          // Tạo ảnh chất lượng cao và tự động tải xuống
+          const dataURL = canvas.toDataURL('image/jpeg', 1.0); // 100% chất lượng
+          const link = document.createElement('a');
+          link.href = dataURL;
+          link.download = `${generateRandomString(6)}_${currentIndex + 1}.jpg`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link); // Xóa liên kết tạm sau khi tải
+
+          currentIndex++; // Tăng chỉ số cho file tiếp theo
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Xử lý sự kiện kéo và thả
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        processImage(file);
+      } else {
+        alert('Please drop an image file!');
+      }
+    });
+
+    // Cho phép nhấp vào drop zone để mở hộp thoại chọn file
+    dropZone.addEventListener('click', () => {
+      uploadInput.click();
+    });
+
+    // Xử lý khi chọn file qua input
+    uploadInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      processImage(file);
+    });
+  </script>
+
+</body>
+</html>
