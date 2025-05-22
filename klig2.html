@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Add Bottom Padding (7.29%) - High Quality JPEG</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      text-align: center;
+      background: #f4f4f4;
+      padding: 2rem;
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    input, .drop-zone, button {
+      margin: 1rem 0.5rem;
+    }
+    canvas {
+      margin-top: 1rem;
+      max-width: 90%;
+      border: 1px solid #ccc;
+    }
+    .drop-zone {
+      border: 2px dashed #ccc;
+      padding: 2rem;
+      background: #fff;
+      cursor: pointer;
+    }
+    .drop-zone.dragover {
+      background: #e1e1e1;
+      border-color: #000;
+    }
+    .error {
+      color: red;
+      margin: 1rem;
+    }
+    #urlInput {
+      width: 300px;
+      padding: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Add Bottom Black Padding (7.29%)</h1>
+  <div>
+    <input type="text" id="urlInput" placeholder="Enter image URL">
+    <button onclick="processImageFromURL()">Load Image</button>
+    <button onclick="pasteAndProcess()">Paste & Load</button>
+  </div>
+  <div id="dropZone" class="drop-zone">Drag and drop an image here or click to select</div>
+  <input type="file" id="upload" accept="image/*" style="display: none;" />
+  <p id="status" class="error"></p>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const uploadInput = document.getElementById('upload');
+    const urlInput = document.getElementById('urlInput');
+    const canvas = document.getElementById('canvas');
+    const status = document.getElementById('status');
+    let currentIndex = 0;
+    let lastProcessedUrl = ''; // Lưu URL đã xử lý trước đó
+
+    // Hàm hiển thị trạng thái
+    function showStatus(message, isError = false) {
+      status.textContent = message;
+      status.className = isError ? 'error' : '';
+      setTimeout(() => status.textContent = '', 3000);
+    }
+
+    // Hàm tạo chuỗi ngẫu nhiên
+    function generateRandomString(length) {
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return result;
+    }
+
+    // Hàm xử lý ảnh (từ file hoặc URL)
+    function processImage(img) {
+      const originalWidth = img.width;
+      const originalHeight = img.height;
+      const padding = Math.floor(originalHeight * 0.0729); // 7.29%
+      canvas.width = originalWidth;
+      canvas.height = originalHeight + padding;
+      const ctx = canvas.getContext('2d');
+
+      // Vẽ ảnh gốc
+      ctx.drawImage(img, 0, 0);
+
+      // Vẽ viền đen bên dưới
+      ctx.fillStyle = 'black';
+      ctx.fillRect(0, originalHeight, originalWidth, padding);
+
+      // Xuất JPEG chất lượng 100%
+      const dataURL = canvas.toDataURL('image/jpeg', 1.0);
+      const link = document.createElement('a');
+      link.href = dataURL;
+      link.download = `${generateRandomString(10)}_${currentIndex + 1}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      currentIndex++;
+      showStatus('Image processed successfully!');
+    }
+
+    // Xử lý file ảnh từ input hoặc kéo-thả
+    function processImageFromFile(file) {
+      if (!file) return;
+      if (file.size > 10 * 1024 * 1024) { // Giới hạn 10MB
+        showStatus('File is too large! Maximum size is 10MB.', true);
+        return;
+      }
+      showStatus('Processing image...');
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        const img = new Image();
+        img.onload = () => processImage(img);
+        img.onerror = () => showStatus('Failed to load image.', true);
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    // Xử lý ảnh từ URL
+    async function processImageFromURL() {
+      const url = urlInput.value.trim();
+      if (!url) {
+        showStatus('Please enter a valid URL.', true);
+        return;
+      }
+      if (url === lastProcessedUrl) {
+        showStatus('This URL has already been processed.', true);
+        return;
+      }
+      showStatus('Loading image from URL...');
+      try {
+        const response = await fetch(url, { mode: 'cors' });
+        if (!response.ok) throw new Error('Network response was not ok');
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) {
+          showStatus('URL does not point to an image.', true);
+          return;
+        }
+        const img = new Image();
+        img.crossOrigin = 'Anonymous'; // Xử lý CORS
+        img.onload = () => {
+          processImage(img);
+          lastProcessedUrl = url; // Cập nhật URL đã xử lý
+        };
+        img.onerror = () => showStatus('Failed to load image from URL.', true);
+        img.src = URL.createObjectURL(blob);
+      } catch (error) {
+        showStatus('Error loading image: ' + error.message, true);
+      }
+    }
+
+    // Hàm lấy link từ clipboard và xử lý
+    async function pasteAndProcess() {
+      try {
+        const clipboardText = await navigator.clipboard.readText();
+        if (!clipboardText) {
+          // showStatus('Clipboard is empty.', true);
+          return;
+        }
+        urlInput.value = clipboardText; // Dán link vào input
+        processImageFromURL(); // Gọi xử lý URL
+      } catch (error) {
+        // showStatus('Failed to read clipboard: ' + error.message, true);
+      }
+    }
+
+    // Sự kiện kéo-thả
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.classList.remove('dragover');
+    });
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        processImageFromFile(file);
+      } else {
+        showStatus('Please drop an image file!', true);
+      }
+    });
+
+    // Nhấp vào drop zone
+    dropZone.addEventListener('click', () => {
+      uploadInput.click();
+    });
+
+    // Chọn file qua input
+    uploadInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      processImageFromFile(file);
+    });
+  </script>
+</body>
+</html>
