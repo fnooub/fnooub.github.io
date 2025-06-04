@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Gemini Prompt Optimizer with Image Download</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 150px; margin-bottom: 10px; }
+    button { padding: 10px 20px; margin: 5px 10px 10px 0; }
+    .prompt-item { display: flex; align-items: center; margin-bottom: 10px; border: 1px solid #ccc; padding: 10px; }
+    .prompt-item img { width: 100px; margin-right: 10px; }
+    .prompt-item textarea { flex: 1; height: 60px; }
+    .prompt-item .stt { width: 50px; font-weight: bold; margin-right: 10px; }
+    .optimize-btn { background-color: #4CAF50; color: white; }
+    .download-btn { background-color: #2196F3; color: white; }
+    .link-json-btn { background-color: #FF9800; color: white; }
+    .status { margin-left: 10px; color: #666; font-size: 0.9em; }
+    .progress-bar { width: 100%; background-color: #ddd; margin: 10px 0; }
+    .progress { height: 20px; background-color: #4CAF50; width: 0%; }
+    #json-output, #link-json-output { white-space: pre-wrap; background: #f0f0f0; padding: 10px; }
+    .reuse-icon { color: green; margin-left: 5px; }
+    .error { color: red; }
+    .total-images { margin: 10px 0; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Gemini Prompt Optimizer with Image Download</h1>
+
+  <div class="input-section">
+    <h2>Input JSON</h2>
+    <textarea id="json-input" placeholder='Paste your JSON here...'></textarea>
+    <br />
+    <button onclick="loadJson()">Load JSON</button>
+    <button class="optimize-btn" onclick="optimizePrompts()">Optimize All Prompts</button>
+    <button class="download-btn" onclick="downloadAllImages()">Download All Images</button>
+    <div class="total-images" id="total-images">Total Images: 0</div>
+    <div class="progress-bar" id="progress-container" style="display: none;">
+      <div class="progress" id="progress-bar"></div>
+    </div>
+  </div>
+
+  <div class="prompt-list" id="prompt-list"></div>
+
+  <div class="output-section">
+    <button onclick="saveChanges()">Save Changes</button>
+    <button onclick="copyJson()">📋 Copy JSON</button>
+    <h2>Output JSON</h2>
+    <pre id="json-output"></pre>
+  </div>
+
+  <div class="link-json-section">
+    <button class="link-json-btn" onclick="downloadLinkJson()">Download Link JSON</button>
+    <button onclick="copyLinkJson()">📋 Copy Link JSON</button>
+    <h2>Link JSON (Image-Prompt Mapping)</h2>
+    <pre id="link-json-output"></pre>
+  </div>
+
+  <script>
+    const USER_API_KEYS = [
+        'AIzaSyA8Jas7u2f3PeJEmBDTTNA8QmpOh79R01k',
+        'AIzaSyAhGG7EmV0UkGjOpu70ZTnHTRy1DSsEKYY',
+        'AIzaSyBvDxj9O55iGIOnqXa6XzCH1a1ne6wCZzQ',
+        'AIzaSyBIrLwhhy6abp6kCNnJryFi-vaH50tKHKE',
+        'AIzaSyCu5DuTWWyNhpYyMBDtl6R6sQKSpxswvWs',
+    ];
+    const MAX_USES_PER_KEY = 5;
+    let currentKeyIndex = 0;
+    let apiKeyUsage = {};
+    let currentData = [];
+    let linkData = [];
+    let isOptimizing = false;
+    let isDownloading = false;
+    let promptCache = {};
+
+    window.onload = function() {
+      const savedJson = localStorage.getItem('json-input');
+      if (savedJson) {
+        document.getElementById('json-input').value = savedJson;
+      }
+    };
+
+    function getApiKeyForAttempt() {
+      if (!USER_API_KEYS || USER_API_KEYS.length === 0 ||
+          USER_API_KEYS.every(key => typeof key !== 'string' || key.length < 30)) {
+        throw new Error('USER_API_KEYS trống hoặc không hợp lệ.');
+      }
+
+      apiKeyUsage[currentKeyIndex] = apiKeyUsage[currentKeyIndex] || 0;
+      let selectedApiKey = USER_API_KEYS[currentKeyIndex];
+
+      if (apiKeyUsage[currentKeyIndex] >= MAX_USES_PER_KEY) {
+        currentKeyIndex = (currentKeyIndex + 1) % USER_API_KEYS.length;
+        apiKeyUsage[currentKeyIndex] = 0;
+        selectedApiKey = USER_API_KEYS[currentKeyIndex];
+      }
+
+      apiKeyUsage[currentKeyIndex]++;
+      return selectedApiKey;
+    }
+
+    function generateRandomString(length) {
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let result = '';
+      for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+      }
+      return result;
+    }
+
+    function processImage(imgSrc, baseFileName, sceneNumber, suffix) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+
+        img.onload = function() {
+          const originalWidth = img.width;
+          const originalHeight = img.height;
+
+          const padding = Math.floor(originalHeight * 0.0729);
+          const canvasPadded = document.createElement('canvas');
+          canvasPadded.width = originalWidth;
+          canvasPadded.height = originalHeight + padding;
+          const ctxPadded = canvasPadded.getContext('2d');
+          ctxPadded.drawImage(img, 0, 0);
+          ctxPadded.fillStyle = 'black';
+          ctxPadded.fillRect(0, originalHeight, originalWidth, padding);
+
+          const dataURLPadded = canvasPadded.toDataURL('image/jpeg', 1.0);
+          const linkPadded = document.createElement('a');
+          linkPadded.href = dataURLPadded;
+          const paddedFileName = sceneNumber
+            ? `[${sceneNumber}]_${baseFileName}_processed_${suffix}.jpg`
+            : `${baseFileName}_processed_${suffix}.jpg`;
+          linkPadded.download = paddedFileName;
+          document.body.appendChild(linkPadded);
+          linkPadded.click();
+          document.body.removeChild(linkPadded);
+
+          const canvasOriginalJPG = document.createElement('canvas');
+          canvasOriginalJPG.width = originalWidth;
+          canvasOriginalJPG.height = originalHeight;
+          const ctxOriginalJPG = canvasOriginalJPG.getContext('2d');
+          ctxOriginalJPG.drawImage(img, 0, 0, originalWidth, originalHeight);
+
+          const dataURLOriginalJPG = canvasOriginalJPG.toDataURL('image/jpeg', 1.0);
+          const linkOriginalJPG = document.createElement('a');
+          linkOriginalJPG.href = dataURLOriginalJPG;
+          const originalFileName = sceneNumber
+            ? `[${sceneNumber}]_${baseFileName}_original_2_${suffix}.jpg`
+            : `${baseFileName}_original_2_${suffix}.jpg`;
+          linkOriginalJPG.download = originalFileName;
+          document.body.appendChild(linkOriginalJPG);
+          linkOriginalJPG.click();
+          document.body.removeChild(linkOriginalJPG);
+
+          resolve({ paddedFileName, originalFileName });
+        };
+
+        img.onerror = function() {
+          reject("Không thể tải ảnh: " + imgSrc);
+        };
+        img.src = imgSrc;
+      });
+    }
+
+    async function optimizeSinglePrompt(prompt, index) {
+      let sceneNumber = null;
+      let cleanedPrompt = prompt;
+      const sceneRegex = /^(?:Scene\s+(\d+):|\[(\d+)\])\s*(.*)$/i;
+      const match = prompt.match(sceneRegex);
+      if (match) {
+        sceneNumber = match[1] || match[2];
+        cleanedPrompt = match[3];
+      }
+
+      const cacheKey = cleanedPrompt.trim();
+      if (promptCache[cacheKey]) {
+        document.getElementById(`status-${index}`).innerHTML =
+          '✓ Reused <span class="reuse-icon">♻</span>';
+        return sceneNumber ? `[${sceneNumber}] ${promptCache[cacheKey]}` : promptCache[cacheKey];
+      }
+
+      try {
+        const GEMINI_API_KEY = getApiKeyForAttempt();
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+        const instruction = `
+# 📘 Hướng Dẫn Tạo Prompt Cinematic Chuẩn KlingAI:
+
+## ✅ Cấu trúc chuẩn:
+[lens] + [subject] + [action or expression] + [emotion or reaction] + [environment or visual detail]
+
+→ Mỗi prompt chỉ 1 dòng, không quá 500 ký tự tiếng Anh.
+→ Luôn bắt đầu bằng tên lens chính xác.
+→ Giữ phong cách điện ảnh, nhiều cảm xúc, hình ảnh rõ ràng.
+
+## 🎥 Các lens thường dùng:
+- the camera rotates around the subject
+- the camera follows the subject moving
+- the camera zooms in
+- the camera zooms out
+- handheld device filming
+- the camera is stationary
+
+## 🧠 Ý nghĩa các thành phần:
+- [lens]: tên ống kính/góc quay – luôn đặt đầu prompt.
+- [subject]: đối tượng chính (người, động vật, nhóm…).
+- [action or expression]: hành động hoặc biểu cảm.
+- [emotion or reaction]: cảm xúc hoặc phản ứng.
+- [environment or visual detail]: khung cảnh, thời tiết, ánh sáng.
+
+## 📌 Ví dụ mẫu:
+the camera rotates around the subject, revealing a rescuer crouched beside a wounded snow leopard, gently stroking its frostbitten face. The animal blinks slowly, then nuzzles into the touch with a faint breath. Snowflakes drift in silence as the arctic wind howls in the distance.
+
+## 📍 Lưu ý:
+- Định dạng đầu ra là 1 dòng tiếng Anh, không ngắt dòng.
+- Tập trung vào chuyển động, cảm xúc, chiều sâu điện ảnh.
+- Nếu prompt gốc tĩnh, thêm hành động để sinh động.
+
+## 🚫 Nguyên tắc An Toàn:
+- Tránh nội dung vi phạm (khủng bố, bạo lực cực đoan).
+- Xử lý yếu tố quân sự trung lập (tránh mô tả vũ khí cụ thể).
+- Không dùng dấu ngoặc kép cho lời thoại, diễn giải gián tiếp.
+
+**YÊU CẦU:**
+Tối ưu hóa PROMPT GỐC thành prompt cinematic chuẩn KlingAI bằng tiếng Anh, 1 dòng, không vượt 500 ký tự, giữ ý tưởng cốt lõi.
+PROMPT GỐC: "${cleanedPrompt}"
+`.trim();
+
+        const payload = {
+          contents: [{ parts: [{ text: instruction }] }],
+        };
+
+        const statusElement = document.getElementById(`status-${index}`);
+        statusElement.textContent = "Optimizing...";
+        statusElement.style.color = "blue";
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(`Gemini API error: ${errorData.error?.message || 'Unknown error'}`);
+        }
+
+        const data = await response.json();
+        if (data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0]) {
+          let optimizedPrompt = data.candidates[0].content.parts[0].text.trim();
+          if (optimizedPrompt.length > 500) {
+            optimizedPrompt = optimizedPrompt.substring(0, 497) + "...";
+          }
+          promptCache[cacheKey] = optimizedPrompt;
+          statusElement.textContent = "✓ Done";
+          statusElement.style.color = "green";
+          return sceneNumber ? `[${sceneNumber}] ${optimizedPrompt}` : optimizedPrompt;
+        } else {
+          throw new Error("Invalid Gemini API response format.");
+        }
+      } catch (error) {
+        console.error(`Error optimizing prompt ${index}:`, error);
+        const statusElement = document.getElementById(`status-${index}`);
+        statusElement.textContent = "Error: " + error.message;
+        statusElement.style.color = "red";
+        return prompt;
+      }
+    }
+
+    function saveToStorage(jsonInput) {
+      localStorage.setItem('json-input', jsonInput);
+    }
+
+    function loadJson() {
+      const jsonInput = document.getElementById("json-input").value;
+      try {
+        const newData = JSON.parse(jsonInput);
+        if (!Array.isArray(newData) || !newData.every(item => item.anh && item.prompt)) {
+          throw new Error("JSON must be an array of objects with 'anh' and 'prompt' properties.");
+        }
+        currentData = [...currentData, ...newData];
+        linkData = [];
+        promptCache = {};
+        apiKeyUsage = {};
+        currentKeyIndex = 0;
+        displayPrompts();
+        document.getElementById("json-output").textContent = "";
+        document.getElementById("link-json-output").textContent = "";
+        document.getElementById("total-images").textContent = `Total Images: ${currentData.length}`;
+        saveToStorage(jsonInput);
+      } catch (error) {
+        alert("Invalid JSON format: " + error.message);
+        console.error(error);
+      }
+    }
+
+    function displayPrompts() {
+      const promptList = document.getElementById("prompt-list");
+      promptList.innerHTML = "<h2>Edit Prompts</h2>";
+
+      currentData.forEach((item, index) => {
+        let sceneNumber = null;
+        const match = item.prompt.match(/^(?:Scene\s+(\d+):|\[(\d+)\])\s*(.*)$/i);
+        if (match) {
+          sceneNumber = match[1] || match[2];
+        }
+
+        const div = document.createElement("div");
+        div.className = "prompt-item";
+        div.innerHTML = `
+          <span class="stt">${sceneNumber ? `[${sceneNumber}]` : ''}</span>
+          <img src="${item.anh}" alt="Image" loading="lazy">
+          <textarea id="prompt-${index}">${item.prompt}</textarea>
+          <button class="optimize-btn" onclick="optimizePrompt(${index})">Optimize</button>
+          <button class="download-btn" onclick="downloadImage(${index})">Download</button>
+          <span class="status" id="status-${index}"></span>
+        `;
+        promptList.appendChild(div);
+      });
+      document.getElementById("total-images").textContent = `Total Images: ${currentData.length}`;
+    }
+
+    async function optimizePrompt(index) {
+      if (isOptimizing) {
+        alert("Optimization in progress.");
+        return;
+      }
+      const originalPrompt = currentData[index].prompt;
+      const optimizedPrompt = await optimizeSinglePrompt(originalPrompt, index);
+      currentData[index].prompt = optimizedPrompt;
+      document.getElementById(`prompt-${index}`).value = optimizedPrompt;
+      saveChanges();
+    }
+
+    async function optimizePrompts() {
+      if (currentData.length === 0) {
+        alert("Please load JSON first.");
+        return;
+      }
+
+      if (isOptimizing) {
+        alert("Optimization in progress.");
+        return;
+      }
+
+      isOptimizing = true;
+      const progressContainer = document.getElementById("progress-container");
+      const progressBar = document.getElementById("progress-bar");
+      progressContainer.style.display = "block";
+      progressBar.style.width = "0%";
+
+      try {
+        for (let i = 0; i < currentData.length; i++) {
+          const originalPrompt = currentData[i].prompt;
+          const optimizedPrompt = await optimizeSinglePrompt(originalPrompt, i);
+          currentData[i].prompt = optimizedPrompt;
+          document.getElementById(`prompt-${i}`).value = optimizedPrompt;
+
+          const progress = Math.round((i + 1) / currentData.length * 100);
+          progressBar.style.width = `${progress}%`;
+          progressBar.textContent = `${progress}%`;
+
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        saveChanges();
+      } catch (error) {
+        console.error("Error optimizing prompts:", error);
+        alert("Error occurred during optimization: " + error.message);
+      } finally {
+        isOptimizing = false;
+        progressContainer.style.display = "none";
+      }
+    }
+
+    async function downloadImage(index) {
+      if (isDownloading) {
+        alert("Download in progress.");
+        return;
+      }
+
+      const statusElement = document.getElementById(`status-${index}`);
+      statusElement.textContent = "Downloading...";
+      statusElement.style.color = "blue";
+
+      try {
+        const prompt = currentData[index].prompt;
+        let sceneNumber = null;
+        const match = prompt.match(/^(?:Scene\s+(\d+):|\[(\d+)\])\s*(.*)$/i);
+        if (match) {
+          sceneNumber = match[1] || match[2];
+        }
+
+        const baseFileName = generateRandomString(6);
+        const suffix = linkData.filter(item => item.stt === (sceneNumber || '')).length + 1;
+        const { paddedFileName, originalFileName } = await processImage(currentData[index].anh, baseFileName, sceneNumber, suffix);
+
+        linkData.push({
+          stt: sceneNumber || '',
+          prompt: prompt,
+          processed_image: paddedFileName,
+          original_image: originalFileName
+        });
+        updateLinkJson();
+
+        statusElement.textContent = "✓ Downloaded";
+        statusElement.style.color = "green";
+      } catch (error) {
+        console.error(`Error downloading image ${index}:`, error);
+        statusElement.textContent = "Error: " + error;
+        statusElement.style.color = "red";
+      }
+    }
+
+    async function downloadAllImages() {
+      if (currentData.length === 0) {
+        alert("Please load JSON first.");
+        return;
+      }
+
+      if (isDownloading) {
+        alert("Download in progress.");
+        return;
+      }
+
+      isDownloading = true;
+      const progressContainer = document.getElementById("progress-container");
+      const progressBar = document.getElementById("progress-bar");
+      progressContainer.style.display = "block";
+      progressBar.style.width = "0%";
+
+      try {
+        for (let i = 0; i < currentData.length; i++) {
+          const statusElement = document.getElementById(`status-${i}`);
+          statusElement.textContent = "Downloading...";
+          statusElement.style.color = "blue";
+
+          const prompt = currentData[i].prompt;
+          let sceneNumber = null;
+          const match = prompt.match(/^(?:Scene\s+(\d+):|\[(\d+)\])\s*(.*)$/i);
+          if (match) {
+            sceneNumber = match[1] || match[2];
+          }
+
+          const baseFileName = generateRandomString(6);
+          const suffix = linkData.filter(item => item.stt === (sceneNumber || '')).length + 1;
+          const { paddedFileName, originalFileName } = await processImage(currentData[i].anh, baseFileName, sceneNumber, suffix);
+
+          linkData.push({
+            stt: sceneNumber || '',
+            prompt: prompt,
+            processed_image: paddedFileName,
+            original_image: originalFileName
+          });
+
+          statusElement.textContent = "✓ Downloaded";
+          statusElement.style.color = "green";
+
+          const progress = Math.round((i + 1) / currentData.length * 100);
+          progressBar.style.width = `${progress}%`;
+          progressBar.textContent = `${progress}%`;
+
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        updateLinkJson();
+      } catch (error) {
+        console.error("Error downloading images:", error);
+        alert("Error occurred during download: " + error.message);
+      } finally {
+        isDownloading = false;
+        progressContainer.style.display = "none";
+      }
+    }
+
+    function updateLinkJson() {
+      const linkArray = linkData.filter(item => item.processed_image && item.original_image);
+      document.getElementById("link-json-output").textContent =
+        JSON.stringify(linkArray, null, 2);
+    }
+
+    function downloadLinkJson() {
+      const linkArray = linkData.filter(item => item.processed_image && item.original_image);
+      if (linkArray.length === 0) {
+        alert("No link JSON to download. Please download images first.");
+        return;
+      }
+
+      const jsonStr = JSON.stringify(linkArray, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'image_prompt_link.json';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }
+
+    function copyLinkJson() {
+      const jsonText = document.getElementById("link-json-output").textContent;
+      if (!jsonText) {
+        alert("Nothing to copy. Please download images first.");
+        return;
+      }
+
+      navigator.clipboard.writeText(jsonText)
+        .then(() => alert("✅ Link JSON copied to clipboard!"))
+        .catch(err => {
+          console.error("Failed to copy link JSON:", err);
+          alert("❌ Failed to copy link JSON.");
+        });
+    }
+
+    function saveChanges() {
+      currentData.forEach((item, index) => {
+        item.prompt = document.getElementById(`prompt-${index}`).value;
+      });
+      document.getElementById("json-output").textContent =
+        JSON.stringify(currentData, null, 2);
+    }
+
+    function copyJson() {
+      const jsonText = document.getElementById("json-output").textContent;
+      if (!jsonText) {
+        alert("Nothing to copy. Please optimize and save first.");
+        return;
+      }
+
+      navigator.clipboard.writeText(jsonText)
+        .then(() => alert("✅ JSON copied to clipboard!"))
+        .catch(err => {
+          console.error("Failed to copy JSON:", err);
+          alert("❌ Failed to copy JSON.");
+        });
+    }
+  </script>
+</body>
+</html>

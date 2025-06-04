@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Enhancer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-4xl">
+        <h1 class="text-2xl font-bold mb-4 text-center">Prompt Enhancer</h1>
+        <div class="flex flex-col gap-4">
+            <div>
+                <label for="json-textarea" class="block text-sm font-medium text-gray-700 mb-1">JSON Data</label>
+                <textarea id="json-textarea" class="w-full h-32 p-2 border border-gray-300 rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nhập dữ liệu JSON (characterPrompts, animalPrompts, contextPrompts, healthStates, defaultContext)"></textarea>
+            </div>
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1">
+                    <label for="input-textarea" class="block text-sm font-medium text-gray-700 mb-1">Input Prompt</label>
+                    <textarea id="input-textarea" class="w-full h-64 p-2 border border-gray-300 rounded-md resize-y focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nhập các dòng prompt, ví dụ: [ingrid] và [koda] ở [làng chài]"></textarea>
+                </div>
+                <div class="flex-1">
+                    <label for="output-textarea" class="block text-sm font-medium text-gray-700 mb-1">Processed Output</label>
+                    <textarea id="output-textarea" class="w-full h-64 p-2 border border-gray-300 rounded-md resize-y bg-gray-50" readonly></textarea>
+                </div>
+            </div>
+            <div class="mt-4 flex justify-end">
+                <button id="process-button" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-blue-300">Process</button>
+            </div>
+            <div id="status" class="mt-2 text-sm text-gray-600"></div>
+        </div>
+
+        <script>
+            let data = null; // Khởi tạo data là null
+
+            function validateAndParseJSON(jsonString) {
+                try {
+                    const parsed = JSON.parse(jsonString);
+                    if (!parsed.characterPrompts || !parsed.animalPrompts || !parsed.contextPrompts || !parsed.healthStates || !parsed.defaultContext) {
+                        throw new Error("JSON phải chứa các trường: characterPrompts, animalPrompts, contextPrompts, healthStates, defaultContext");
+                    }
+                    return parsed;
+                } catch (e) {
+                    throw new Error(`JSON không hợp lệ: ${e.message}`);
+                }
+            }
+
+            function saveJSONToLocalStorage(jsonString) {
+                try {
+                    localStorage.setItem('promptEnhancerData', jsonString);
+                    statusElement.textContent = 'JSON hợp lệ và đã được lưu!';
+                    statusElement.classList.remove('text-red-600');
+                    statusElement.classList.add('text-green-600');
+                } catch (e) {
+                    statusElement.textContent = 'Lỗi khi lưu JSON vào localStorage: ' + e.message;
+                    statusElement.classList.remove('text-green-600');
+                    statusElement.classList.add('text-red-600');
+                }
+            }
+
+            function loadJSONFromLocalStorage() {
+                const savedJSON = localStorage.getItem('promptEnhancerData');
+                if (savedJSON) {
+                    try {
+                        data = validateAndParseJSON(savedJSON);
+                        jsonTextarea.value = savedJSON;
+                        statusElement.textContent = 'Đã khôi phục JSON từ localStorage!';
+                        statusElement.classList.remove('text-red-600');
+                        statusElement.classList.add('text-green-600');
+                    } catch (e) {
+                        data = null;
+                        statusElement.textContent = 'JSON trong localStorage không hợp lệ: ' + e.message;
+                        statusElement.classList.remove('text-green-600');
+                        statusElement.classList.add('text-red-600');
+                    }
+                } else {
+                    // Load default JSON if no saved data
+                    jsonTextarea.value = JSON.stringify({
+                        "characterPrompts": {
+                            "sven": {
+                                "default": "A 10-year-old boy, short blond hair, blue jacket, gray pants, brown hiking boots, red scarf."
+                            },
+                            "elsa": {
+                                "default": "A 35-year-old woman, short blond hair, orange wool jacket, black pants, black boots, green scarf."
+                            }
+                        },
+                        "animalPrompts": {
+                            "koda": {
+                                "bị thương": "A surreal and hyper-detailed polar bear, its back transformed into a crystalline honeycomb...",
+                                "default": "An adult polar bear, thick white fur, large build, dark eyes."
+                            }
+                        },
+                        "contextPrompts": {
+                            "làng chài bắc âu": {
+                                "description": "Snowy alpine village, wooden houses, rocky shore, dim sunlight, cold mountain wind.",
+                                "keywords": ["Làng chài Bắc Âu"]
+                            }
+                        },
+                        "healthStates": {
+                            "bị thương": ["bị thương"],
+                            "default": ["default"]
+                        },
+                        "defaultContext": "làng chài bắc âu"
+                    }, null, 2);
+                    try {
+                        data = validateAndParseJSON(jsonTextarea.value);
+                        saveJSONToLocalStorage(jsonTextarea.value);
+                    } catch (e) {
+                        data = null;
+                        statusElement.textContent = e.message;
+                        statusElement.classList.remove('text-green-600');
+                        statusElement.classList.add('text-red-600');
+                    }
+                }
+            }
+
+            function detectHealthState(text) {
+                const lowerText = text.toLowerCase();
+                if (lowerText.includes('bị thương') || lowerText.includes('[bị thương]')) {
+                    return 'bị thương';
+                }
+                return 'default';
+            }
+
+            function detectContext(text) {
+                if (!data) return ['làng chài bắc âu'];
+                const contexts = [];
+                for (const [context, { keywords }] of Object.entries(data.contextPrompts)) {
+                    for (const keyword of keywords) {
+                        const escapedKeyword = keyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                        const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
+                        if (regex.test(text)) {
+                            contexts.push(context);
+                        }
+                    }
+                }
+                return contexts.length > 0 ? contexts : [data.defaultContext];
+            }
+
+            function getCharacterDescription(character, context) {
+                if (!data) return '';
+                const charLower = character.replace(/[\[\]]/g, '').toLowerCase();
+                const charKey = Object.keys(data.characterPrompts).find(
+                    key => key.toLowerCase() === charLower
+                );
+                return charKey ? (data.characterPrompts[charKey]?.[context] || data.characterPrompts[charKey]?.['default'] || '') : '';
+            }
+
+            function getAnimalDescription(animal, healthState) {
+                if (!data) return '';
+                const animalLower = animal.replace(/[\[\]]/g, '').toLowerCase();
+                const animalKey = Object.keys(data.animalPrompts).find(
+                    key => key.toLowerCase() === animalLower
+                );
+                return animalKey ? (data.animalPrompts[animalKey]?.[healthState] || data.animalPrompts[animalKey]?.['default'] || '') : '';
+            }
+
+            function processPrompt(input, singleLine = false) {
+                if (!input.trim()) {
+                    return 'Please enter a prompt.';
+                }
+
+                if (!data) {
+                    return 'Please enter valid JSON data.';
+                }
+
+                const entityRegex = /\[([^\]]*)\]/g;
+                let entities = [];
+                let match;
+                while ((match = entityRegex.exec(input)) !== null) {
+                    entities.push(match[1].toLowerCase());
+                }
+
+                let cleanedInput = input.replace(entityRegex, '$1');
+
+                const allNames = [
+                    ...Object.keys(data.characterPrompts),
+                    ...Object.keys(data.animalPrompts),
+                    ...entities
+                ].map(name => name.toLowerCase());
+
+                allNames.forEach(name => {
+                    const escapedName = name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                    const regex = new RegExp(`\\b${escapedName}\\s*(['’]s|[,.?])(?=\\s|$)`, 'gi');
+                    cleanedInput = cleanedInput.replace(regex, `${name} `);
+                });
+
+                const healthState = detectHealthState(cleanedInput);
+                const contextKeywords = [];
+                for (const ctx in data.contextPrompts) {
+                    contextKeywords.push(...data.contextPrompts[ctx].keywords);
+                }
+
+                const allKeywords = [
+                    ...Object.keys(data.characterPrompts),
+                    ...Object.keys(data.animalPrompts),
+                    ...entities,
+                    ...contextKeywords
+                ].map(kw => ({
+                    text: kw,
+                    lower: kw.toLowerCase(),
+                    isContext: contextKeywords.includes(kw)
+                }));
+
+                allKeywords.sort((a, b) => b.text.length - a.text.length);
+
+                const maxKeywordWords = Math.max(
+                    ...allKeywords.map(kw => kw.text.split(/\s+/).length)
+                );
+
+                const tokens = cleanedInput.split(/(\s+)/);
+                let result = [];
+                const processedKeywords = new Set();
+                let i = 0;
+
+                while (i < tokens.length) {
+                    let token = tokens[i];
+                    let found = false;
+
+                    if (token.match(/\s+/)) {
+                        result.push(token);
+                        i++;
+                        continue;
+                    }
+
+                    for (let wordCount = maxKeywordWords; wordCount >= 1; wordCount--) {
+                        if (i + wordCount * 2 - 1 > tokens.length) continue;
+
+                        let phraseTokens = [];
+                        for (let j = 0; j < wordCount * 2 - 1; j++) {
+                            if (i + j < tokens.length) {
+                                phraseTokens.push(tokens[i + j]);
+                            }
+                        }
+                        const phrase = phraseTokens.join('').trim();
+                        const phraseLower = phrase.toLowerCase();
+
+                        const matchedKeyword = allKeywords.find(kw => kw.lower === phraseLower);
+                        if (matchedKeyword && !processedKeywords.has(phraseLower)) {
+                            let replacement = phrase;
+                            let desc = '';
+
+                            if (data.characterPrompts[matchedKeyword.text.toLowerCase()]) {
+                                const contexts = detectContext(cleanedInput);
+                                const context = contexts.find(ctx => data.contextPrompts[ctx].keywords.some(kw => kw.toLowerCase() === phraseLower)) || contexts[0] || data.defaultContext;
+                                desc = getCharacterDescription(matchedKeyword.text, context);
+                            } else if (data.animalPrompts[matchedKeyword.text.toLowerCase()]) {
+                                desc = getAnimalDescription(matchedKeyword.text, healthState);
+                            } else if (entities.includes(matchedKeyword.lower)) {
+                                const contexts = detectContext(cleanedInput);
+                                const context = contexts.find(ctx => data.contextPrompts[ctx].keywords.some(kw => kw.toLowerCase() === phraseLower)) || contexts[0] || data.defaultContext;
+                                desc = data.characterPrompts[matchedKeyword.lower]
+                                    ? getCharacterDescription(matchedKeyword.text, context)
+                                    : data.animalPrompts[matchedKeyword.lower]
+                                    ? getAnimalDescription(matchedKeyword.text, healthState)
+                                    : matchedKeyword.text;
+                            } else if (matchedKeyword.isContext) {
+                                const contextKey = Object.keys(data.contextPrompts).find(ctx =>
+                                    data.contextPrompts[ctx].keywords.some(kw => kw.toLowerCase() === phraseLower)
+                                );
+                                if (contextKey && !processedKeywords.has(`context:${contextKey}`)) {
+                                    desc = data.contextPrompts[contextKey].description;
+                                    processedKeywords.add(`context:${contextKey}`);
+                                }
+                            }
+
+                            if (desc) {
+                                replacement = `${replacement} (${desc}) `;
+                            }
+
+                            result.push(replacement);
+                            processedKeywords.add(phraseLower);
+                            i += wordCount * 2 - 1;
+                            found = true;
+                            break;
+                        }
+                    }
+
+                    if (!found) {
+                        result.push(token);
+                        i++;
+                    }
+                }
+
+                return result.join('');
+            }
+
+            const jsonTextarea = document.getElementById('json-textarea');
+            const inputTextarea = document.getElementById('input-textarea');
+            const outputTextarea = document.getElementById('output-textarea');
+            const processButton = document.getElementById('process-button');
+            const statusElement = document.getElementById('status');
+
+            // Load JSON from localStorage or set default
+            loadJSONFromLocalStorage();
+
+            jsonTextarea.addEventListener('input', () => {
+                try {
+                    data = validateAndParseJSON(jsonTextarea.value);
+                    saveJSONToLocalStorage(jsonTextarea.value);
+                } catch (e) {
+                    data = null;
+                    statusElement.textContent = e.message;
+                    statusElement.classList.remove('text-green-600');
+                    statusElement.classList.add('text-red-600');
+                }
+            });
+
+            processButton.addEventListener('click', () => {
+                if (!data) {
+                    statusElement.textContent = 'Vui lòng nhập JSON hợp lệ trước!';
+                    jsonTextarea.focus();
+                    return;
+                }
+
+                const lines = inputTextarea.value.split('\n').filter(line => line.trim());
+                if (lines.length === 0) {
+                    statusElement.textContent = 'Vui lòng nhập ít nhất một dòng!';
+                    inputTextarea.focus();
+                    return;
+                }
+
+                statusElement.textContent = 'Đang xử lý...';
+                processButton.disabled = true;
+
+                const processedLines = lines.map((line, index) => {
+                    const result = processPrompt(line, true);
+                    const stt = index + 1;
+                    return result === 'Please enter a prompt.' ? `[${stt}]: [Rỗng]` : `[${stt}]: ${result}`;
+                });
+
+                outputTextarea.value = processedLines.join('\n');
+                statusElement.textContent = `Đã xử lý ${lines.length} dòng với số thứ tự!`;
+                statusElement.classList.remove('text-red-600');
+                statusElement.classList.add('text-green-600');
+                processButton.disabled = false;
+            });
+        </script>
+    </body>
+</html>
